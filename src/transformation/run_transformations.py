@@ -3,33 +3,44 @@ from sqlalchemy import text
 from src.utils.db_client import get_db_engine
 
 def run_sql_file(conn, file_path):
-    """Hilfsfunktion, um eine einzelne SQL-Datei über eine bestehende Verbindung auszuführen."""
     with open(file_path, 'r') as f:
         query = f.read()
     conn.execute(text(query))
-    print(f"   ↳ ✅ SQL ausgeführt: {os.path.basename(file_path)}")
+    print(f"   ↳ ✅ ausgeführt: {os.path.basename(file_path)}")
 
 def transform_data():
     engine = get_db_engine()
     staging_dir = os.path.join('sql', 'staging')
     
-    # Sicherstellen, dass der Ordner existiert
-    if not os.path.exists(staging_dir):
-        print(f"⚠️ Ordner {staging_dir} nicht gefunden.")
-        return
-
-    files = sorted([f for f in os.listdir(staging_dir) if f.endswith('.sql')])
     
-    print(f"🚀 Starte {len(files)} Daten-Transformationen...")
+    layers = {
+        # 1. CLEANING: Nur Rohdaten säubern (Datentypen, NULL-Werte)
+        "SILVER_STAGING": ["stg_matches.sql", "stg_standings.sql"],
+        
+        # 2. CORE: Das Star-Schema aufbauen (Stabile Basis)
+        "SILVER_CORE": ["dim_teams.sql", "fact_matches.sql"],
+        
+        # 3. GOLD: Die finalen Produkte für das Dashboard
+        "GOLD_MARTS": [
+            "fct_standings.sql", 
+            "fct_season_trends.sql", 
+            "fct_team_form.sql", 
+            "fct_home_away_stats.sql", 
+            "fct_team_ratings.sql"
+        ]
+    }
+
+    print("🚀 Starte strukturierte Transformation (dbt-Style)...")
     
     with engine.connect() as conn:
-        for file_name in files:
-            file_path = os.path.join(staging_dir, file_name)
-            run_sql_file(conn, file_path)
+        for layer_name, files in layers.items():
+            print(f"\n--- {layer_name} ---")
+            for file_name in files:
+                file_path = os.path.join(staging_dir, file_name)
+                if os.path.exists(file_path):
+                    run_sql_file(conn, file_path)
+                else:
+                    print(f"   ⚠️ Datei übersprungen (nicht gefunden): {file_name}")
         
-        # Wichtig: Erst ganz am Ende commiten, wenn alles ohne Fehler lief
         conn.commit()
-    print("🏁 Alle Transformationen erfolgreich abgeschlossen.")
-
-if __name__ == "__main__":
-    transform_data()
+    print("\n🏁 Alle Layer erfolgreich aufgebaut.")
