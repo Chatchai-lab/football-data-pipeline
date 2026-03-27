@@ -2,6 +2,7 @@ import requests
 import os
 import pandas as pd
 from src.utils.db_client import get_db_engine
+from sqlalchemy import text
 
 def ingest_bundesliga_teams():
     # API Konfiguration
@@ -9,13 +10,12 @@ def ingest_bundesliga_teams():
     url = "https://api.football-data.org/v4/competitions/BL1/teams"
     headers = {"X-Auth-Token": api_key}
     
-    
-    print(" Rufe Bundesliga-Teams von API ab..")
+    print("📡 Rufe Bundesliga-Teams von API ab...")
     response = requests.get(url, headers=headers)
     
     if response.status_code == 200:
         data = response.json()
-        teams = data.get('teams',[])
+        teams = data.get('teams', [])
         
         # 2. Daten transformieren
         team_list = []
@@ -26,7 +26,7 @@ def ingest_bundesliga_teams():
                 'short_name': t['shortName'],
                 'tla': t['tla'],
                 'crest_url': t['crest'],
-                'adress': t['address'],
+                'address': t['address'], 
             })
             
         df = pd.DataFrame(team_list)
@@ -34,12 +34,17 @@ def ingest_bundesliga_teams():
         # 3. In Datenbank schreiben
         engine = get_db_engine()
         
-        df.to_sql('raw_teams', engine, if_exists='replace', index=False)
+        with engine.connect() as conn:
+            conn.execute(text("TRUNCATE TABLE raw_teams;"))
+            conn.commit()
+        
+        df.to_sql('raw_teams', engine, if_exists='append', index=False)
         
         print(f"✅ Erfolg! {len(df)} Teams wurden in 'raw_teams' gespeichert.")
+        return len(df) # WICHTIG für dein Logging in main.py
     else:
         print(f"❌ Fehler beim Abrufen der Daten: {response.status_code}")
-        print(response.text)
+        return 0 # Gibt 0 zurück, falls der API-Call fehlschlägt
         
 if __name__ == "__main__":
     ingest_bundesliga_teams()
