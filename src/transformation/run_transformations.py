@@ -23,7 +23,7 @@ def transform_data():
         # 3. GOLD: Die finalen Produkte für das Dashboard
         "GOLD_MARTS": [
             "fct_standings.sql", 
-            "fct_season_trends.sql", 
+            "fct_season_trend.sql", 
             "fct_team_form.sql", 
             "fct_home_away_stats.sql", 
             "fct_team_ratings.sql"

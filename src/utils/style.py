@@ -64,5 +64,52 @@ def apply_custom_style():
         section[data-testid="stSidebar"] h3 {
             color: #000000 !important;
         }
+        
+       /* STYLING FÜR DEN EXPANDER (DROPDOWN) */
+        
+        /* 1. Der Header (das anklickbare Feld) */
+        div[data-testid="stExpander"] details summary {
+            background-color: #2e7d32 !important; /* Helleres Grün für Sichtbarkeit */
+            border: 1px solid #3fb34f !important; /* Noch hellere Kante */
+            border-radius: 10px !important;
+            padding: 10px !important;
+            transition: all 0.3s ease;
+        }
+
+        /* 2. Hover-Effekt: Wenn man mit der Maus drüberfährt */
+        div[data-testid="stExpander"] details summary:hover {
+            background-color: #3fb34f !important;
+            border-color: #ffffff !important;
+        }
+
+        /* 3. Text im Header weiß und fett */
+        div[data-testid="stExpander"] details summary p {
+            color: white !important;
+            font-weight: 700 !important;
+            font-size: 1.1rem !important;
+        }
+
+        /* 4. Den roten Rahmen (Focus) komplett eliminieren */
+        div[data-testid="stExpander"] details summary:focus,
+        div[data-testid="stExpander"] details {
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #3fb34f !important;
+        }
+
+        /* 5. Der Inhaltsbereich (wenn aufgeklappt) */
+        div[data-testid="stExpander"] details[open] > div {
+            background-color: #1a4a25 !important;
+            border: 1px solid #2e7d32 !important;
+            border-top: none !important;
+            border-radius: 0 0 10px 10px !important;
+            color: white !important;
+        }
+
+        /* 6. Das Icon (Pfeil) weiß färben */
+        div[data-testid="stExpander"] svg {
+            fill: white !important;
+        }
+        
         </style>
         """, unsafe_allow_html=True)
