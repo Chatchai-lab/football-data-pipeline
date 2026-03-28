@@ -19,27 +19,27 @@ Diese Sektion dokumentiert, welche Dashboard-Seite ihre Daten aus welcher Gold-T
 ### 1. Liga-Ansicht (Tabelle)
 - **Gold-Tabelle:** `fct_standings`
 - **Inhalt:** Berechnet Punkte, Tore, Differenz und Platzierung pro Saison.
-- *[Screenshot: Liga-Ansicht]*
+![Liga-Ansicht](docs/screenshots/liga_ansicht.png)
 
-### 2. Form-Ansicht
+### 2. Team-Analyse
 - **Gold-Tabelle:** `fct_team_form`
-- **Inhalt:** Die Rollierende Form der letzten 5 Spiele (W/D/L) basierend auf dem Spieldatum.
-- *[Screenshot: Form-Ansicht]*
+- **Inhalt:** Performance-Daten, Punktentwicklung und Formtrend eines spezifischen Teams.
+![Team-Analyse](docs/screenshots/team_analyse.png)
 
 ### 3. Saisonverlauf (Trends)
 - **Gold-Tabelle:** `fct_season_trend`
 - **Inhalt:** Kumulierte Tore und Punkte über alle Spieltage hinweg zur Trend-Visualisierung.
-- *[Screenshot: Trend-Ansicht]*
+![Trend-Ansicht](docs/screenshots/saisonverlauf.png)
 
 ### 4. Heim/Auswärts-Analyse
 - **Gold-Tabelle:** `fct_home_away_stats`
 - **Inhalt:** Detaillierte Performance-Metriken (Tore, Punkte, Siege) getrennt nach Spielort.
-- *[Screenshot: Heim/Auswärts-Analyse]*
+![Heim/Auswärts-Analyse](docs/screenshots/heim_auswaerts.png)
 
 ### 5. Leistungsanalyse (Ratings)
 - **Gold-Tabelle:** `fct_team_ratings`
 - **Inhalt:** Abgeleitete Metriken zur Team-Stärke basierend auf Siegquoten und Torverhältnissen.
-- *[Screenshot: Rating-Ansicht]*
+![Rating-Ansicht](docs/screenshots/team_ratings.png)
 
 ---
 
