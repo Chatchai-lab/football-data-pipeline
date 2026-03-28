@@ -36,12 +36,23 @@ st.caption("Daten basierend auf den globalen Filtern in der Sidebar.")
 # --- FILTER-BEREICH ---
 with st.container():
     st.subheader("🔍 Analyse-Einstellungen")
-    # Wir verwenden die globalen Filter
-    selected_teams = filters["comparisons"]
-    if not selected_teams:
-        selected_teams = [filters["team"]] # Fallback auf das primäre Team
     
-    show_benchmarks = st.toggle("Benchmarks einblenden", value=True)
+    # Verfügbare Teams für die aktuelle Saison
+    all_teams = df_all_trends['team_name'].unique().tolist()
+    all_teams.sort()
+
+    # Standard-Auswahl: Primäres Team + vorherige Vergleiche aus der Sidebar
+    default_selection = [t for t in [filters["team"]] + filters["comparisons"] if t in all_teams]
+
+    # Lokaler Multi-Selektor auf der Seite
+    selected_teams = st.multiselect(
+        "Zusätzliche Vereine zum Vergleich hinzufügen:",
+        options=all_teams,
+        default=default_selection,
+        help="Hier kannst du unabhängig von der Sidebar weitere Teams zum Chart hinzufügen."
+    )
+    
+    show_benchmarks = st.toggle("Benchmarks (CL / Klassenerhalt) einblenden", value=True)
 
 st.divider()
 
