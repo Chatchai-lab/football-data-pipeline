@@ -12,10 +12,23 @@ apply_custom_style()
 # --- GLOBALE FILTER ---
 # Wir rufen die Filter ganz am Anfang auf, um season und team zu erhalten
 filters = get_global_filters()
-selected_team = filters["team"]
 selected_season = filters["season"]
 
+# --- LOKALES TEAM-DROPDOWN ---
+# Wir erlauben es, auf dieser Seite ein anderes Team zu wählen als das globale standard-team
 engine = get_db_engine()
+from sqlalchemy import text
+teams_query = text("SELECT DISTINCT team_name FROM fct_standings WHERE season = :s ORDER BY team_name")
+teams_df = pd.read_sql(teams_query, engine.connect(), params={"s": selected_season})
+team_list = teams_df['team_name'].tolist()
+
+# Der Standardwert ist das global gewählte Team
+st.markdown("### 🔍 Team wechseln")
+selected_team = st.selectbox(
+    "Team für Detail-Analyse wählen:", 
+    options=team_list, 
+    index=team_list.index(filters["team"]) if filters["team"] in team_list else 0
+)
 
 # --- DATENLADEN ---
 @st.cache_data
