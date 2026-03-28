@@ -3,6 +3,7 @@ WITH match_results AS (
     -- Wir holen alle beendeten Spiele und bestimmen Sieg, Niederlage oder Unentschieden
     SELECT 
         utc_date,
+        season,
         home_team_id AS team_id,
         CASE 
             WHEN winner = 'HOME_TEAM' THEN 'W' 
@@ -13,6 +14,7 @@ WITH match_results AS (
     UNION ALL
     SELECT 
         utc_date,
+        season,
         away_team_id AS team_id,
         CASE 
             WHEN winner = 'AWAY_TEAM' THEN 'W' 
@@ -25,16 +27,18 @@ ranked_matches AS (
     -- Wir nummerieren die Spiele pro Team nach Datum (das aktuellste ist 1)
     SELECT 
         team_id,
+        season,
         result,
-        ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY utc_date DESC) as recency_rank
+        ROW_NUMBER() OVER (PARTITION BY team_id, season ORDER BY utc_date DESC) as recency_rank
     FROM match_results
 )
 -- Wir fassen die letzten 5 Ergebnisse zu einem String zusammen
 SELECT 
     t.team_name,
     t.tla,
+    r.season,
     STRING_AGG(r.result, '-' ORDER BY r.recency_rank DESC) AS form_trend
 FROM ranked_matches r
 JOIN dim_teams t ON r.team_id = t.team_id
 WHERE r.recency_rank <= 5
-GROUP BY t.team_name, t.tla;
+GROUP BY t.team_name, t.tla, r.season;

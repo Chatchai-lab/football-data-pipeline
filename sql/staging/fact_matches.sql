@@ -2,6 +2,7 @@ CREATE OR REPLACE VIEW fact_matches AS
 SELECT 
     match_id,
     CAST(utc_date AS TIMESTAMP) AS match_timestamp,
+    season,
     matchday,
     status,
     home_team_id, 

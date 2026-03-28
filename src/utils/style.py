@@ -40,6 +40,23 @@ def apply_custom_style():
             fill: #ffffff !important;
         }
 
+        /* Tabellen Styling (Besonders für Rohdaten-Ansicht) */
+        .stTable, [data-testid="stTable"], [data-testid="stTable"] td, [data-testid="stTable"] th {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+        
+        [data-testid="stTable"] thead tr th {
+            color: #ffffff !important;
+            background-color: #1a4a25 !important;
+            font-weight: bold;
+        }
+
+        /* Sicherstellen, dass Pandas DataFrame Styles (st.table) weiß sind */
+        div[data-testid="stTable"] table {
+            color: #ffffff !important;
+        }
+
         /* Divider Farbe anpassen */
         hr {
             border-color: #2e7d32;

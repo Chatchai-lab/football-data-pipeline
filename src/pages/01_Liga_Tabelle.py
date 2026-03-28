@@ -3,29 +3,33 @@ import pandas as pd
 import plotly.express as px
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
+from src.utils.filters import get_global_filters
 
 # --- SETUP & DATEN ---
 st.set_page_config(page_title="Liga-Übersicht", layout="wide")
 apply_custom_style()
+filters = get_global_filters()
 
 engine = get_db_engine()
 
 @st.cache_data
-def get_league_data():
-    query = """
+def get_league_data(season_val):
+    from sqlalchemy import text
+    query = text("""
     SELECT 
         s.*, 
         t.crest_url 
     FROM fct_standings s
     JOIN dim_teams t ON s.team_name = t.team_name
+    WHERE s.season = :season_param
     ORDER BY s.total_points DESC, s.goal_diff DESC
-    """
-    return pd.read_sql(query, engine)
+    """)
+    return pd.read_sql(query, engine.connect(), params={"season_param": season_val})
 
-df = get_league_data()
+df = get_league_data(filters["season"])
 
 # --- TITEL ---
-st.title("🏆 Bundesliga Liga-Übersicht")
+st.title(f"🏆 Bundesliga Liga-Übersicht - Saison {filters['season']}")
 st.caption("Live-Daten aus der Analytics-Pipeline")
 # --- KPI-KARTEN (Task: KPI-Karten für...) ---
 col1, col2, col3, col4 = st.columns(4)

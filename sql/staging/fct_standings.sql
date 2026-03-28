@@ -2,6 +2,7 @@ CREATE OR REPLACE VIEW fct_standings AS
 WITH team_stats AS (
     -- Heimspiele auswerten
     SELECT 
+        season,
         home_team_id AS team_id,
         CASE 
             WHEN winner = 'HOME_TEAM' THEN 3
@@ -18,6 +19,7 @@ WITH team_stats AS (
     
     -- Auswärtsspiele auswerten
     SELECT 
+        season,
         away_team_id AS team_id,
         CASE 
             WHEN winner = 'AWAY_TEAM' THEN 3
@@ -31,6 +33,7 @@ WITH team_stats AS (
     WHERE status = 'FINISHED'
 )
 SELECT 
+    s.season,
     t.team_name,
     t.tla, -- Kürzel (z.B. FCB, BVB)
     SUM(s.match_count) AS matches_played,
@@ -42,5 +45,5 @@ SELECT
     ROUND(CAST(SUM(s.points) AS DECIMAL) / SUM(s.match_count), 2) AS points_per_match
 FROM team_stats s
 JOIN dim_teams t ON s.team_id = t.team_id
-GROUP BY t.team_name, t.tla
-ORDER BY total_points DESC, goal_diff DESC;
+GROUP BY s.season, t.team_name, t.tla
+ORDER BY s.season DESC,total_points DESC, goal_diff DESC;

@@ -5,6 +5,12 @@ from src.utils.db_client import get_db_engine
 def run_sql_file(conn, file_path):
     with open(file_path, 'r') as f:
         query = f.read()
+    
+    # Extra check for views to avoid column rename errors in PostgreSQL
+    if "CREATE OR REPLACE VIEW" in query:
+        view_name = query.split("VIEW")[1].split("AS")[0].strip()
+        conn.execute(text(f"DROP VIEW IF EXISTS {view_name} CASCADE;"))
+        
     conn.execute(text(query))
     print(f"   ↳ ✅ ausgeführt: {os.path.basename(file_path)}")
 

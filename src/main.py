@@ -15,7 +15,12 @@ def run_pipeline():
         # SCHRITT 1: Ingestion (Extraktion & Laden)
         print("\n[1/2] Starte Datenerfassung von API.." )
         count_teams = ingest_bundesliga_teams()
-        count_matches = ingest_bundesliga_matches()
+        
+        # Aktuelle und vergangene Saisons laden
+        saisons = [2024, 2025] 
+        count_matches = 0
+        for s in saisons:
+            count_matches += ingest_bundesliga_matches(season=s)
         
         run_quality_checks()
         

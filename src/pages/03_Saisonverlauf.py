@@ -4,48 +4,44 @@ import plotly.express as px
 import plotly.graph_objects as go 
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
+from src.utils.filters import get_global_filters
 
 # --- SETUP ---
 st.set_page_config(page_title="Saisonverlauf", layout="wide")
 apply_custom_style()
+filters = get_global_filters()
 engine = get_db_engine()
 
 # --- DATENLADEN ---
 @st.cache_data
-def load_trend_data():
-    query = """
+def load_trend_data(season):
+    from sqlalchemy import text
+    query = text("""
         SELECT matchday, team_name, cumulative_points 
         FROM fct_season_trend 
+        WHERE season = :s
         ORDER BY matchday ASC
-    """
-    df = pd.read_sql(query, engine)
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn, params={"s": season})
     df['matchday'] = pd.to_numeric(df['matchday'])
     return df
 
-df_all_trends = load_trend_data()
+df_all_trends = load_trend_data(filters["season"])
 
 # --- TITEL ---
-st.title("📈 Saisonverlauf & Team-Vergleich")
-st.caption("Wähle unten die Teams aus, die du im direkten Vergleich sehen möchtest.")
+st.title(f"📈 Saisonverlauf & Team-Vergleich ({filters['season']})")
+st.caption("Daten basierend auf den globalen Filtern in der Sidebar.")
 
 # --- FILTER-BEREICH ---
 with st.container():
     st.subheader("🔍 Analyse-Einstellungen")
-    # Wir erstellen zwei Spalten: Eine für die Teams, eine für den Schalter
-    col_teams, col_toggle = st.columns([3, 1])
+    # Wir verwenden die globalen Filter
+    selected_teams = filters["comparisons"]
+    if not selected_teams:
+        selected_teams = [filters["team"]] # Fallback auf das primäre Team
     
-    with col_teams:
-        all_teams = sorted(df_all_trends['team_name'].unique())
-        selected_teams = st.multiselect(
-            "Vergleiche mehrere Teams miteinander:",
-            options=all_teams,
-            default=all_teams[:3]
-        )
-    
-    with col_toggle:
-        st.write("####") # Kleiner Abstandshalter für die Optik
-        # WICHTIG: Hier definieren wir die Variable, die unten in der IF-Abfrage genutzt wird
-        show_benchmarks = st.toggle("Benchmarks einblenden", value=True)
+    show_benchmarks = st.toggle("Benchmarks einblenden", value=True)
 
 st.divider()
 
