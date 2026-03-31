@@ -5,10 +5,13 @@ import plotly.graph_objects as go
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
+from src.utils.components import render_navbar, render_sidebar_close
 
 # --- SETUP ---
-st.set_page_config(page_title="Saisonverlauf", layout="wide")
+st.set_page_config(page_title="Saisonverlauf", layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
+render_navbar(is_landing=False)
+render_sidebar_close()
 filters = get_global_filters()
 engine = get_db_engine()
 
@@ -28,6 +31,16 @@ def load_trend_data(season):
     return df
 
 df_all_trends = load_trend_data(filters["season"])
+
+# --- TEAM-WAPPEN LADEN ---
+@st.cache_data
+def load_team_crests():
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        df = pd.read_sql(text("SELECT team_name, crest_url FROM dim_teams"), conn)
+    return dict(zip(df['team_name'], df['crest_url']))
+
+crests = load_team_crests()
 
 # --- TITEL ---
 st.title(f"📈 Saisonverlauf & Team-Vergleich ({filters['season']})")
@@ -60,6 +73,15 @@ st.divider()
 if not selected_teams:
     st.warning("⚠️ Bitte wähle mindestens ein Team aus, um die Daten zu visualisieren.")
 else:
+    # Ausgewählte Teams mit Wappen anzeigen
+    team_cols = st.columns(min(len(selected_teams), 6))
+    for idx, team in enumerate(selected_teams[:6]):
+        with team_cols[idx]:
+            crest = crests.get(team, '')
+            if crest:
+                st.image(crest, width=40)
+            st.caption(team)
+
     # Daten filtern
     df_filtered = df_all_trends[df_all_trends['team_name'].isin(selected_teams)]
 

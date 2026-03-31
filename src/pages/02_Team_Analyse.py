@@ -4,10 +4,13 @@ import plotly.express as px
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters  # NEU: Filter importieren
+from src.utils.components import render_navbar, render_sidebar_close
 
 # --- SETUP ---
-st.set_page_config(page_title="Team-Analyse", layout="wide")
+st.set_page_config(page_title="Team-Analyse", layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
+render_navbar(is_landing=False)
+render_sidebar_close()
 
 # --- GLOBALE FILTER ---
 # Wir rufen die Filter ganz am Anfang auf, um season und team zu erhalten

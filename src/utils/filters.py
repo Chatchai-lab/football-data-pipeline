@@ -5,6 +5,7 @@ from src.utils.db_client import get_db_engine
 engine = get_db_engine()
 
 def get_global_filters():
+    # Close-Button (×) wird per JS in style.py injiziert
     st.sidebar.header("🌍 Globale Filter")
     
     # 1. Saisons dynamisch aus dem neuen View laden

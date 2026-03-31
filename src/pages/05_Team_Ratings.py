@@ -5,10 +5,13 @@ import plotly.graph_objects as go
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
+from src.utils.components import render_navbar, render_sidebar_close
 
 # --- SETUP ---
-st.set_page_config(page_title="Team Ratings", layout="wide")
+st.set_page_config(page_title="Team Ratings", layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
+render_navbar(is_landing=False)
+render_sidebar_close()
 filters = get_global_filters()
 engine = get_db_engine()
 
@@ -28,6 +31,16 @@ def load_rating_data(season):
     return df
 
 df_ratings = load_rating_data(filters["season"])
+
+# --- TEAM-WAPPEN LADEN ---
+@st.cache_data
+def load_team_crests():
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        df = pd.read_sql(text("SELECT team_name, crest_url FROM dim_teams"), conn)
+    return dict(zip(df['team_name'], df['crest_url']))
+
+crests = load_team_crests()
 
 # --- TITEL & BESCHREIBUNG ---
 st.title(f"📊 Team-Rating & Leistungsanalyse ({filters['season']})")
@@ -103,6 +116,15 @@ selected_teams = st.multiselect(
 )
 
 if selected_teams:
+    # Ausgewählte Teams mit Wappen anzeigen
+    team_cols = st.columns(min(len(selected_teams), 5))
+    for idx, team in enumerate(selected_teams[:5]):
+        with team_cols[idx]:
+            crest = crests.get(team, '')
+            if crest:
+                st.image(crest, width=50)
+            st.caption(team)
+
     fig_radar = go.Figure()
     
     # Wir definieren die Achsen für das Radar
@@ -147,8 +169,12 @@ with st.expander("📝 Alle Rating-Rohdaten anzeigen"):
     # Kopie für die Anzeige mit schöneren Namen erstellen
     display_ratings = df_sorted.copy()
     
+    # Wappen-Spalte hinzufügen
+    display_ratings['crest_url'] = display_ratings['team_name'].map(crests)
+
     # Spalten umbenennen für die Anzeige
     display_ratings = display_ratings.rename(columns={
+        'crest_url': ' ',
         'team_name': 'Team',
         'total_games': 'Spiele Gesamt',
         'goals_per_game': 'Tore Ø / Spiel',
@@ -158,4 +184,11 @@ with st.expander("📝 Alle Rating-Rohdaten anzeigen"):
     })
     
     # Index entfernen (sieht sauberer aus)
-    st.table(display_ratings)
+    st.dataframe(
+        display_ratings,
+        column_config={
+            " ": st.column_config.ImageColumn("", width="small")
+        },
+        hide_index=True,
+        use_container_width=True
+    )

@@ -9,5 +9,6 @@ SELECT
     away_team AS away_team_name,
     CAST(score_home AS INTEGER) AS goals_home,
     CAST(score_away AS INTEGER) AS goals_away,
-    winner
+    winner,
+    season
 FROM raw_matches;

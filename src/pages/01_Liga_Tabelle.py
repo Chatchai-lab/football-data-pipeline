@@ -4,10 +4,13 @@ import plotly.express as px
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
+from src.utils.components import render_navbar, render_sidebar_close
 
 # --- SETUP & DATEN ---
-st.set_page_config(page_title="Liga-Übersicht", layout="wide")
+st.set_page_config(page_title="Liga-Übersicht", layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
+render_navbar(is_landing=False)
+render_sidebar_close()
 filters = get_global_filters()
 
 engine = get_db_engine()
