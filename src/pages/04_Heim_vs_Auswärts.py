@@ -109,17 +109,17 @@ with idx_col1:
 
 with idx_col2:
     if hv_index > 20:
-        st.success(f"🔥 **Festung {team_data['team_name']}:** Dieses Team ist im eigenen Stadion deutlich dominanter.")
+        st.success(f" **Festung {team_data['team_name']}:** Dieses Team ist im eigenen Stadion deutlich dominanter.")
     elif hv_index < -10:
-        st.warning(f"✈️ **Auswärtsspezialist:** {team_data['team_name']} performt in der Fremde überraschend stark.")
+        st.warning(f" **Auswärtsspezialist:** {team_data['team_name']} performt in der Fremde überraschend stark.")
     else:
-        st.info(f"⚖️ **Balanced:** Die Leistung von {team_data['team_name']} ist stabil, egal wo gespielt wird.")
+        st.info(f" **Balanced:** Die Leistung von {team_data['team_name']} ist stabil, egal wo gespielt wird.")
 
 # --- VISUALISIERUNG (Task: Heim- und Auswärtspunkte / Tore darstellen) ---
 col_left, col_right = st.columns(2)
 
 with col_left:
-    st.subheader("📊 Punkte & Tore Vergleich")
+    st.subheader(" Punkte & Tore Vergleich")
     
     # Vorbereitung der Daten für ein gruppiertes Balkendiagramm
     plot_data = pd.DataFrame({
@@ -146,7 +146,7 @@ with col_left:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with col_right:
-    st.subheader("🎯 Tor-Verhältnis (Radar/Spider)")
+    st.subheader(" Tor-Verhältnis (Radar/Spider)")
     
     # Radar Chart für eine intuitive "Balance"-Ansicht
     categories = ['Punkte', 'Siege', 'Tore+', 'Tore-']
@@ -180,7 +180,7 @@ with col_right:
     st.plotly_chart(fig_radar, use_container_width=True)
 
 # --- EXPANDER (Rohdaten anzeigen) ---
-with st.expander("📝 Alle Rohdaten für " + selected_team):
+with st.expander(" Alle Rohdaten für " + selected_team):
     # Spaltennamen für die Anzeige verschönern
     display_df = pd.DataFrame([team_data]).rename(columns={
         'team_name': 'Team',

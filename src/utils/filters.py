@@ -6,7 +6,7 @@ engine = get_db_engine()
 
 def get_global_filters():
     # Close-Button (×) wird per JS in style.py injiziert
-    st.sidebar.header("🌍 Globale Filter")
+    st.sidebar.header("Globale Filter")
     
     # 1. Saisons dynamisch aus dem neuen View laden
     seasons_df = pd.read_sql("SELECT DISTINCT season FROM fct_standings ORDER BY season DESC", engine)

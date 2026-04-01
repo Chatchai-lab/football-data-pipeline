@@ -43,7 +43,7 @@ def load_team_crests():
 crests = load_team_crests()
 
 # --- TITEL ---
-st.title(f"📈 Saisonverlauf & Team-Vergleich ({filters['season']})")
+st.title(f" Saisonverlauf & Team-Vergleich ({filters['season']})")
 st.caption("Daten basierend auf den globalen Filtern in der Sidebar.")
 
 # --- FILTER-BEREICH ---

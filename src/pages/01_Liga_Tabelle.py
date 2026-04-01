@@ -32,7 +32,7 @@ def get_league_data(season_val):
 df = get_league_data(filters["season"])
 
 # --- TITEL ---
-st.title(f"🏆 Bundesliga Liga-Übersicht - Saison {filters['season']}")
+st.title(f" Bundesliga Liga-Übersicht - Saison {filters['season']}")
 st.caption("Live-Daten aus der Analytics-Pipeline")
 # --- KPI-KARTEN (Task: KPI-Karten für...) ---
 col1, col2, col3, col4 = st.columns(4)

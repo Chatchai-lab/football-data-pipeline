@@ -43,7 +43,7 @@ def load_team_crests():
 crests = load_team_crests()
 
 # --- TITEL & BESCHREIBUNG ---
-st.title(f"📊 Team-Rating & Leistungsanalyse ({filters['season']})")
+st.title(f" Team-Rating & Leistungsanalyse ({filters['season']})")
 
 # Task: Beschreibung der Kennzahlen aufnehmen
 with st.expander("ℹ️ Erläuterung der Kennzahlen"):
@@ -57,7 +57,7 @@ with st.expander("ℹ️ Erläuterung der Kennzahlen"):
 st.divider()
 
 # --- SEKTION 1: LIGA-RANKING (ÜBERSICHT) ---
-st.subheader("🏆 Globales Liga-Ranking")
+st.subheader(" Globales Liga-Ranking")
 
 # Task: Teams nach Rating sortierbar machen
 sort_options = {
@@ -101,7 +101,7 @@ st.plotly_chart(fig_rank, use_container_width=True)
 st.divider()
 
 # --- SEKTION 2: DETAIL-VERGLEICH (RADAR) ---
-st.subheader("🎯 Team-DNA im Direktvergleich")
+st.subheader(" Team-DNA im Direktvergleich")
 
 # Nutze die globalen Filter als Standard (Primäres Team + Vergleichs-Teams)
 default_teams = [filters["team"]] + filters["comparisons"]
@@ -165,7 +165,7 @@ else:
     st.info("Wähle oben mindestens ein Team aus, um die DNA-Analyse zu starten.")
 
 # --- DATENTABELLE ---
-with st.expander("📝 Alle Rating-Rohdaten anzeigen"):
+with st.expander(" Alle Rating-Rohdaten anzeigen"):
     # Kopie für die Anzeige mit schöneren Namen erstellen
     display_ratings = df_sorted.copy()
     

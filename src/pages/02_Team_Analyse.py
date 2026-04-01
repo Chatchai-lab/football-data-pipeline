@@ -26,7 +26,7 @@ teams_df = pd.read_sql(teams_query, engine.connect(), params={"s": selected_seas
 team_list = teams_df['team_name'].tolist()
 
 # Der Standardwert ist das global gewählte Team
-st.markdown("### 🔍 Team wechseln")
+st.markdown("###  Team wechseln")
 selected_team = st.selectbox(
     "Team für Detail-Analyse wählen:", 
     options=team_list, 

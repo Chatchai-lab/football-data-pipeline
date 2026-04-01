@@ -45,7 +45,7 @@ st.divider()
 # KPI-BEREICH
 # ──────────────────────────────────────────────
 st.markdown('<div id="liga-highlights"></div>', unsafe_allow_html=True)
-st.subheader(f"🏆 Liga-Highlights ({selected_season})")
+st.subheader(f" Liga-Highlights ({selected_season})")
 leader_df, home_df, attack_df, form_df = get_league_highlights(selected_season)
 render_kpi_row(leader_df, home_df, attack_df, form_df)
 
@@ -58,7 +58,7 @@ st.divider()
 # SPIELPLAN
 # ──────────────────────────────────────────────
 st.markdown('<div id="spielplan"></div>', unsafe_allow_html=True)
-st.subheader("🗓️ Aktueller Spielplan")
+st.subheader(" Aktueller Spielplan")
 
 df_matches = get_match_schedule(selected_season)
 crests = get_team_crests()
