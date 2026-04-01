@@ -26,6 +26,8 @@ services:
       - "8501:8501"
     env_file:
       - .env
+    environment:
+      - LOG_LEVEL=INFO
 
   # --- pgAdmin (optional, nur für lokale DB sinnvoll) ---
   # pgadmin:

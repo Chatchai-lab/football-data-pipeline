@@ -60,6 +60,46 @@ def get_league_highlights(season: str) -> tuple:
     return leader, home_king, attack_king, form_king
 
 
+@st.cache_data(ttl=300)
+def get_db_status() -> dict:
+    """Liefert Live-Infos über den Zustand der Datenbank.
+
+    Returns:
+        dict mit keys: last_update, match_count, team_count, season_count, db_online
+    """
+    status = {
+        "last_update": None,
+        "match_count": 0,
+        "team_count": 0,
+        "season_count": 0,
+        "db_online": False,
+    }
+    try:
+        with engine.connect() as conn:
+            status["db_online"] = True
+
+            # Letztes Match-Update (neuester utc_date-Eintrag)
+            row = conn.execute(text(
+                "SELECT MAX(match_timestamp) AS last_ts FROM stg_matches"
+            )).fetchone()
+            if row and row[0]:
+                status["last_update"] = row[0].strftime("%d.%m.%Y %H:%M")
+
+            # Zähler
+            status["match_count"] = conn.execute(
+                text("SELECT COUNT(*) FROM raw_matches")
+            ).scalar() or 0
+            status["team_count"] = conn.execute(
+                text("SELECT COUNT(*) FROM raw_teams")
+            ).scalar() or 0
+            status["season_count"] = conn.execute(
+                text("SELECT COUNT(DISTINCT season) FROM raw_matches")
+            ).scalar() or 0
+    except Exception:
+        status["db_online"] = False
+    return status
+
+
 @st.cache_data
 def get_match_schedule(season: str) -> pd.DataFrame:
     """Lädt den kompletten Spielplan einer Saison aus stg_matches."""

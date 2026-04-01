@@ -233,8 +233,15 @@ def render_project_info():
         """)
 
 def render_db_style_footer():
-    """Rendert den professionellen Footer mit Social Links, visuell vom Rest getrennt."""
-    footer_html = """
+    """Rendert den professionellen Footer mit Live-DB-Status, Social Links und Kontakt."""
+    from src.utils.data_loaders import get_db_status
+
+    db = get_db_status()
+    status_color = "#2d7a5e" if db["db_online"] else "#e74c3c"
+    status_label = "Online" if db["db_online"] else "Offline"
+    last_update = db["last_update"] or "—"
+
+    footer_html = f"""
     <div style="background:#0e1117; margin-top:60px; padding:50px 30px 30px; border-top:3px solid #2d7a5e; font-family:'Segoe UI',sans-serif;">
         <div style="max-width:1100px; margin:0 auto;">
             <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:30px; margin-bottom:35px;">
@@ -247,8 +254,12 @@ def render_db_style_footer():
                     <p style="color:#8892a4; font-size:0.85rem; line-height:1.8; margin:0;">Python · SQL · Streamlit<br>PostgreSQL · Docker<br>GitHub Actions CI/CD</p>
                 </div>
                 <div style="flex:1; min-width:200px;">
-                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:2px; color:#2d7a5e; margin-bottom:12px; font-weight:700;">Pipeline Status</div>
-                    <div style="display:inline-block; border:1px solid #2d7a5e; padding:6px 14px; color:#2d7a5e; font-size:0.8rem; border-radius:20px; font-weight:600;">● Online</div>
+                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:2px; color:#2d7a5e; margin-bottom:12px; font-weight:700;">DB-Status</div>
+                    <div style="display:inline-block; border:1px solid {status_color}; padding:6px 14px; color:{status_color}; font-size:0.8rem; border-radius:20px; font-weight:600; margin-bottom:10px;">● {status_label}</div>
+                    <p style="color:#8892a4; font-size:0.78rem; line-height:1.8; margin:4px 0 0 0;">
+                        Letztes Update: <b style="color:#c5cad3;">{last_update}</b><br>
+                        {db["match_count"]} Spiele · {db["team_count"]} Teams · {db["season_count"]} Saisons
+                    </p>
                 </div>
                 <div style="flex:1; min-width:200px;">
                     <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:2px; color:#2d7a5e; margin-bottom:12px; font-weight:700;">Connect</div>

@@ -1,4 +1,4 @@
-name: "⚽ Nightly ELT Pipeline"
+name: " Nightly ELT Pipeline"
 
 # ──────────────────────────────────────────────
 # Trigger: Jede Nacht um 04:00 Uhr (Europe/Berlin ≈ 02:00 UTC)

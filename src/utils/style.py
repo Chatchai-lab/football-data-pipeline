@@ -8,6 +8,11 @@ def apply_custom_style():
             background-color: #1a1f2c;
             color: #ffffff;
         }
+
+        /* Health-Seite in der Sidebar-Navigation verstecken */
+        [data-testid="stSidebarNav"] li:last-child {
+            display: none;
+        }
         
         /* KPI Karten Styling (Matchlytics Grün Akzent) */
         div[data-testid="stMetric"] {
