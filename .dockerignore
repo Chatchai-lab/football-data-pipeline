@@ -20,4 +20,3 @@ docker-compose.yml
 *.md
 *.log
 .env
-docs/

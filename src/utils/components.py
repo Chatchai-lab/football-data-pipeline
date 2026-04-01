@@ -21,7 +21,9 @@ def render_navbar(is_landing=True):
     import os
 
     logo_b64 = ""
-    logo_path = "docs/screenshots/logo.png"
+    # Pfad relativ zur Projektstruktur – funktioniert lokal, in Docker und auf Render
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "docs", "screenshots", "logo", "logo.png")
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
