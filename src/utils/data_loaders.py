@@ -78,9 +78,10 @@ def get_db_status() -> dict:
         with engine.connect() as conn:
             status["db_online"] = True
 
-            # Letztes Match-Update (neuester utc_date-Eintrag)
+            # Letztes Daten-Update: Zeitpunkt des letzten abgeschlossenen Spiels
             row = conn.execute(text(
-                "SELECT MAX(match_timestamp) AS last_ts FROM stg_matches"
+                "SELECT MAX(match_timestamp) AS last_ts FROM stg_matches "
+                "WHERE status = 'FINISHED'"
             )).fetchone()
             if row and row[0]:
                 status["last_update"] = row[0].strftime("%d.%m.%Y %H:%M")
