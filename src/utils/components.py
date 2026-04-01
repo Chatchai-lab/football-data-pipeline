@@ -152,7 +152,7 @@ def render_match_card(
             f"{wday}, {mt.day}.{mt.month}. {row['match_time']}</div>"
         )
 
-    html = f'<div style="background:#242b3d; border:1px solid #2d7a5e; border-radius:10px; padding:12px 15px; margin-bottom:10px; color:#fff; font-family:sans-serif;">{date_html}<div style="display:flex; justify-content:space-between; align-items:center;"><div style="flex:1; text-align:left; font-size:0.85rem;">{home_img}<b>{row["home_team_name"]}</b></div><div style="flex:0 0 65px; text-align:center; background:{score_bg}; border-radius:5px; padding:3px; font-weight:bold; color:#fff;">{score}</div><div style="flex:1; text-align:right; font-size:0.85rem;"><b>{row["away_team_name"]}</b>{away_img}</div></div></div>'
+    html = f'<div style="background:#242b3d; border:1px solid #2d7a5e; border-radius:10px; padding:12px 15px; margin-bottom:10px; color:#fff; font-family:sans-serif; overflow:hidden;">{date_html}<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:nowrap;"><div style="flex:1; text-align:left; font-size:clamp(0.7rem,2.5vw,0.85rem); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{home_img}<b>{row["home_team_name"]}</b></div><div style="flex:0 0 auto; min-width:55px; text-align:center; background:{score_bg}; border-radius:5px; padding:3px 6px; font-weight:bold; color:#fff; font-size:clamp(0.75rem,2.5vw,0.9rem);">{score}</div><div style="flex:1; text-align:right; font-size:clamp(0.7rem,2.5vw,0.85rem); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>{row["away_team_name"]}</b>{away_img}</div></div></div>'
     target.html(html)
 
 

@@ -207,5 +207,133 @@ def apply_custom_style():
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
+
+        /* ═══════════════════════════════════════════════════════════
+           RESPONSIVE / MOBILE STYLES
+           ═══════════════════════════════════════════════════════════ */
+
+        /* ─── Viewport Meta (Streamlit setzt das, aber zur Sicherheit) ─── */
+        @media screen and (max-width: 768px) {
+
+            /* ── Navbar kompakter ── */
+            .matchlytics-nav {
+                padding: 8px 12px !important;
+                min-height: 70px !important;
+                gap: 8px;
+            }
+
+            .matchlytics-nav .nav-logo img {
+                height: 60px !important;
+            }
+
+            .matchlytics-nav .nav-logo {
+                margin-left: 5px !important;
+            }
+
+            /* Nav-Links auf Mobil ausblenden (Sidebar reicht) */
+            .matchlytics-nav .nav-links {
+                display: none !important;
+            }
+
+            /* Burger kleiner */
+            .nav-burger {
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 1.5rem !important;
+            }
+
+            /* ── Hauptinhalt: weniger Padding ── */
+            .main .block-container {
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+                padding-top: 10px !important;
+            }
+
+            /* ── Streamlit Columns: untereinander statt nebeneinander ── */
+            div[data-testid="stHorizontalBlock"] {
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+
+            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+                min-width: 100% !important;
+            }
+
+            /* ── KPI Karten: volle Breite, weniger Padding ── */
+            div[data-testid="stMetric"] {
+                padding: 10px !important;
+            }
+
+            div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+                font-size: 1.2rem !important;
+            }
+
+            div[data-testid="stMetric"] label {
+                font-size: 0.8rem !important;
+            }
+
+            /* ── Überschriften kleiner ── */
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1rem !important; }
+
+            /* ── Plotly Charts: nicht über den Screen hinaus ── */
+            .js-plotly-plot, .plot-container, .plotly {
+                width: 100% !important;
+                max-width: 100vw !important;
+            }
+
+            /* ── Tabellen scrollbar machen ── */
+            [data-testid="stTable"],
+            [data-testid="stDataFrame"],
+            .stDataFrame {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* ── Expander volle Breite ── */
+            div[data-testid="stExpander"] {
+                width: 100% !important;
+            }
+
+            /* ── Footer: untereinander ── */
+            .db-footer-grid {
+                flex-direction: column !important;
+            }
+        }
+
+        /* ─── Kleine Handys (< 480px) ─── */
+        @media screen and (max-width: 480px) {
+
+            .matchlytics-nav {
+                padding: 6px 8px !important;
+                min-height: 55px !important;
+            }
+
+            .matchlytics-nav .nav-logo img {
+                height: 45px !important;
+            }
+
+            .nav-burger {
+                width: 36px !important;
+                height: 36px !important;
+                font-size: 1.3rem !important;
+            }
+
+            .main .block-container {
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+            }
+
+            h1 { font-size: 1.3rem !important; }
+            h2 { font-size: 1.1rem !important; }
+
+            div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+                font-size: 1rem !important;
+            }
+        }
+
         </style>
     """, unsafe_allow_html=True)
