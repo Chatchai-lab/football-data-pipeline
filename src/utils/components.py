@@ -3,11 +3,24 @@ Wiederverwendbare UI-Komponenten für die Matchlytics-App.
 Trennt HTML/CSS-Rendering von der Seitenlogik.
 """
 
+import os
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 
 # --- KONSTANTEN ---
 WDAYS_DE = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
+
+# --- Projekt-Basispfad ---
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def get_favicon():
+    """Gibt ein PIL.Image des Favicons (favicon.png, 32x32) zurück, oder None."""
+    favicon_path = os.path.join(_BASE_DIR, "docs", "logo", "favicon.png")
+    if os.path.exists(favicon_path):
+        return Image.open(favicon_path)
+    return None
 
 
 def render_sidebar_close():
@@ -22,14 +35,13 @@ def render_navbar(is_landing=True):
 
     logo_b64 = ""
     # Pfad relativ zur Projektstruktur – funktioniert lokal, in Docker und auf Render
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    logo_path = os.path.join(base_dir, "docs", "screenshots", "logo", "logo.png")
+    logo_path = os.path.join(_BASE_DIR, "docs", "logo", "logo.png")
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
 
     logo_img = (
-        f'<img src="data:image/png;base64,{logo_b64}" height="160">'
+        f'<img src="data:image/png;base64,{logo_b64}" height="200">'
         if logo_b64
         else '<span style="color:#2d7a5e; font-weight:700; font-size:3rem;">Matchlytics</span>'
     )
@@ -257,7 +269,7 @@ def render_db_style_footer():
                 </div>
             </div>
             <div style="border-top:1px solid #1a2030; padding-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <p style="color:#555; font-size:0.75rem; margin:0;">© 2026 Chatchai Sirichot · Hochschule Darmstadt</p>
+                <p style="color:#555; font-size:0.75rem; margin:0;">© 2026 Chatchai Sirichot · Built with ❤️ and Python</p>
                 <p style="color:#555; font-size:0.75rem; margin:0;">Matchlytics — Bundesliga Data Pipeline</p>
             </div>
         </div>

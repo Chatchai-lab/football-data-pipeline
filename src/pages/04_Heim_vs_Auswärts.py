@@ -5,10 +5,10 @@ import plotly.graph_objects as go
 from src.utils.db_client import get_db_engine
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
-from src.utils.components import render_navbar, render_sidebar_close
+from src.utils.components import render_navbar, render_sidebar_close, get_favicon
 
 # --- SETUP ---
-st.set_page_config(page_title="Heim vs. Auswärts", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Heim vs. Auswärts", page_icon=get_favicon(), layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
 render_navbar(is_landing=False)
 render_sidebar_close()

@@ -17,6 +17,7 @@ from src.utils.data_loaders import (
 )
 from src.utils.components import (
     WDAYS_DE,
+    get_favicon,
     render_kpi_row,
     render_match_card,
     render_matchday_header,
@@ -27,7 +28,7 @@ from src.utils.components import (
 )
 
 # --- SETUP ---
-st.set_page_config(page_title="Matchlytics | Bundesliga", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Matchlytics | Bundesliga", page_icon=get_favicon(), layout="wide", initial_sidebar_state="collapsed")
 apply_custom_style()
 render_navbar(is_landing=True)
 render_sidebar_close()
