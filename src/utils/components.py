@@ -11,79 +11,8 @@ WDAYS_DE = {0: "Mo", 1: "Di", 2: "Mi", 3: "Do", 4: "Fr", 5: "Sa", 6: "So"}
 
 
 def render_sidebar_close():
-    """Injiziert einen sichtbaren X-Close-Button direkt IN die Sidebar (oben rechts)."""
-    components.html("""
-        <script>
-        (function() {
-            const doc = window.parent.document;
-            
-            function injectX() {
-                // Selektiere die Sidebar
-                const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-                if (!sidebar) return;
-                
-                // Prüfen ob Sidebar ausgeklappt ist
-                const isExpanded = sidebar.getAttribute('aria-expanded') !== 'false';
-                if (!isExpanded) return;
-
-                // Falls unser Button noch nicht existiert, erstelle ihn INNERHALB der Sidebar
-                if (!doc.getElementById('ml-internal-x')) {
-                    const x = doc.createElement('div');
-                    x.id = 'ml-internal-x';
-                    x.innerHTML = '&#10005;'; // fettes X
-                    x.style.cssText = `
-                        position: absolute;
-                        top: 15px;
-                        right: 20px;
-                        z-index: 2000001;
-                        cursor: pointer;
-                        font-size: 32px;
-                        color: #ffffff !important;
-                        font-family: Arial, sans-serif;
-                        font-weight: bold;
-                        background: none;
-                        width: 40px;
-                        height: 40px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        user-select: none;
-                        transition: transform 0.2s ease;
-                        pointer-events: auto;
-                    `;
-                    
-                    x.onmouseover = function() { this.style.transform = 'scale(1.2)'; };
-                    x.onmouseout = function() { this.style.transform = 'scale(1.0)'; };
-                    
-                    x.onclick = function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Suche den nativen Streamlit Close Button (Pfeil nach links)
-                        const closeBtn = doc.querySelector('section[data-testid="stSidebar"] button[kind="header"]') 
-                                      || doc.querySelector('section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]');
-                        if (closeBtn) {
-                            closeBtn.click();
-                        }
-                    };
-                    
-                    // Wir hängen es DIRECT in die Sidebar ein (nicht in den body!)
-                    sidebar.appendChild(x);
-                }
-            }
-
-            // Altes X vom body entfernen, falls es noch dort schwebt
-            const oldX = doc.getElementById('ml-custom-x');
-            if (oldX) oldX.remove();
-
-            // Intervall für Injektion
-            if (!window.parent._ml_sidebar_internal_logic) {
-                window.parent._ml_sidebar_internal_logic = setInterval(injectX, 300);
-            }
-            
-            injectX();
-        })();
-        </script>
-    """, height=0)
+    """Kein custom X mehr nötig – der native Streamlit-Close-Button reicht."""
+    pass
 
 
 def render_navbar(is_landing=True):

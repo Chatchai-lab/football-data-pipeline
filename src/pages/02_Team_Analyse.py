@@ -83,7 +83,8 @@ def load_team_details(team_name: str, season: str):
 # --- HILFSFUNKTIONEN (Form-Badges etc. bleiben gleich) ---
 def parse_form_trend(form_str: str) -> list[str]:
     if not form_str or pd.isna(form_str): return []
-    tokens = [t.strip().upper() for t in str(form_str).replace("-", "").split() if t] # Vereinfacht
+    # Format: "L-W-D-W-L" -> split by "-"
+    tokens = [t.strip().upper() for t in str(form_str).split("-") if t.strip()]
     return [t for t in tokens if t in {"W", "D", "L"}]
 
 def render_form_badges(results: list[str]):

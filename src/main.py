@@ -1,9 +1,9 @@
 # src/main.py
 from src.ingestion.ingest_teams import ingest_bundesliga_teams
-from src.ingestion.ingest_matches import ingest_bundesliga_matches
+from src.ingestion.ingest_matches import ingest_bundesliga_matches, get_available_seasons
 import datetime
 from src.transformation.run_transformations import transform_data
-from src.tests.test_data_quality import run_quality_checks
+from tests.test_database_integrity import run_quality_checks
 
 def run_pipeline():
     start_time = datetime.datetime.now()
@@ -16,8 +16,11 @@ def run_pipeline():
         print("\n[1/2] Starte Datenerfassung von API.." )
         count_teams = ingest_bundesliga_teams()
         
-        # Aktuelle und vergangene Saisons laden
-        saisons = [2024, 2025] 
+        # Saisons dynamisch von der API laden (ALLE verfügbaren)
+        all_seasons = get_available_seasons()
+        saisons = all_seasons  # Alle Saisons laden
+        print(f"📅 Lade {len(saisons)} Saisons: {saisons[:5]}{'...' if len(saisons) > 5 else ''}")
+        
         count_matches = 0
         for s in saisons:
             count_matches += ingest_bundesliga_matches(season=s)

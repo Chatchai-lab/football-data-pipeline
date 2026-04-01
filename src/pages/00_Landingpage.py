@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
 from src.utils.data_loaders import (
