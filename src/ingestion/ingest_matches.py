@@ -96,8 +96,11 @@ def ingest_bundesliga_matches(season=None):
         # ABER: Wir löschen vorher nur die Daten DIESER Saison, um Dubletten zu vermeiden
         if not df.empty:
             with engine.connect() as conn:
-                conn.execute(text(f"DELETE FROM raw_matches WHERE season = '{season_year}'"))
-                conn.commit()
+                try:
+                    conn.execute(text(f"DELETE FROM raw_matches WHERE season = '{season_year}'"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()  # Tabelle existiert noch nicht – wird von to_sql erstellt
             
             df.to_sql('raw_matches', engine, if_exists='append', index=False)
         

@@ -35,8 +35,11 @@ def ingest_bundesliga_teams():
         engine = get_db_engine()
         
         with engine.connect() as conn:
-            conn.execute(text("TRUNCATE TABLE raw_teams;"))
-            conn.commit()
+            try:
+                conn.execute(text("TRUNCATE TABLE raw_teams;"))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # Tabelle existiert noch nicht – wird von to_sql erstellt
         
         df.to_sql('raw_teams', engine, if_exists='append', index=False)
         
