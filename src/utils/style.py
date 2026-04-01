@@ -223,7 +223,7 @@ def apply_custom_style():
             }
 
             .matchlytics-nav .nav-logo img {
-                height: 60px !important;
+                height: 120px !important;
             }
 
             .matchlytics-nav .nav-logo {
@@ -313,7 +313,7 @@ def apply_custom_style():
             }
 
             .matchlytics-nav .nav-logo img {
-                height: 45px !important;
+                height: 90px !important;
             }
 
             .nav-burger {
