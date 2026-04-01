@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
@@ -13,8 +11,28 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  pgadmin: # Optional: Ein Web-Interface, um die DB anzusehen
+  app:
+    build: .
+    container_name: football_dashboard
+    restart: always
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+
+  pgadmin:
     image: dpage/pgadmin4
     container_name: football_pgadmin
     environment:

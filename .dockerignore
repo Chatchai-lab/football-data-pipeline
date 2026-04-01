@@ -1,0 +1,23 @@
+# ─── Python / venv ───
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ─── Git ───
+.git/
+.gitignore
+
+# ─── IDE ───
+.vscode/
+.idea/
+
+# ─── Docker (nicht rekursiv einbetten) ───
+docker-compose.yml
+.dockerignore
+
+# ─── Sonstiges ───
+*.md
+*.log
+.env
+docs/

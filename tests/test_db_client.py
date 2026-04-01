@@ -27,6 +27,7 @@ class TestGetDbEngine:
 
     def test_default_port_is_5433(self):
         """Ohne DB_PORT wird der Standardport 5433 verwendet."""
+        import os
         env = {
             "DB_USER": "user",
             "DB_PASSWORD": "pass",
@@ -34,6 +35,7 @@ class TestGetDbEngine:
             "DB_HOST": "localhost",
         }
         with patch.dict("os.environ", env, clear=False):
+            os.environ.pop("DB_PORT", None)
             engine = self._call_get_db_engine()
             assert "5433" in str(engine.url)
 
