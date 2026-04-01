@@ -1,4 +1,4 @@
-name: "⚽ Nightly ETL Pipeline"
+name: "⚽ Nightly ELT Pipeline"
 
 # ──────────────────────────────────────────────
 # Trigger: Jede Nacht um 04:00 Uhr (Europe/Berlin ≈ 02:00 UTC)
@@ -10,8 +10,8 @@ on:
   workflow_dispatch:             # Manueller Trigger über "Run workflow"-Button
 
 jobs:
-  etl:
-    name: "Run ETL Pipeline"
+  elt:
+    name: "Run ELT Pipeline"
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -35,14 +35,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       # ── 3. Abhängigkeiten installieren ──
       - name: "📦 Install Dependencies"
         run: pip install --no-cache-dir -r requirements.txt
 
       # ── 4. Pipeline ausführen ──
-      - name: "🚀 Run ETL Pipeline"
+      - name: "🚀 Run ELT Pipeline"
         run: python src/main.py
 
       # ── 5. Erfolgsmeldung ──
@@ -59,7 +58,7 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🔴 ETL Pipeline fehlgeschlagen – ${new Date().toISOString().split('T')[0]}`,
+              title: ` ELT Pipeline fehlgeschlagen – ${new Date().toISOString().split('T')[0]}`,
               body: [
                 '## Pipeline-Fehler',
                 '',
