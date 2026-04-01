@@ -26,7 +26,7 @@
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 | Liga-Tabelle | Team-Analyse | Saisonverlauf |
 |:---:|:---:|:---:|
@@ -38,7 +38,7 @@
 
 ---
 
-## 🏗️ Systemarchitektur
+## Systemarchitektur
 
 ```mermaid
 flowchart LR
@@ -90,7 +90,7 @@ flowchart LR
 
 ---
 
-## 🛠️ Tech-Stack
+## Tech-Stack
 
 | Bereich | Technologie |
 |---|---|
@@ -105,7 +105,7 @@ flowchart LR
 
 ---
 
-## 🥇 Datenmodell – Medallion Architecture
+## Datenmodell – Medallion Architecture
 
 ### Bronze Layer — Rohdaten
 Die API-Daten werden 1:1 in die Datenbank geladen.
@@ -137,7 +137,7 @@ Business-ready Views, die direkt vom Dashboard konsumiert werden.
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### Voraussetzungen
 - [Docker](https://docs.docker.com/get-docker/) & Docker Compose
@@ -214,7 +214,7 @@ football-data-pipeline/
 
 ---
 
-## ⚙️ CI/CD & Monitoring
+## CI/CD & Monitoring
 
 | Feature | Details |
 |---|---|
@@ -227,7 +227,7 @@ football-data-pipeline/
 
 ---
 
-## 📄 Lizenz
+## Lizenz
 
 Dieses Projekt dient als Portfolio-Projekt. Datenquelle: [football-data.org](https://www.football-data.org/).
 
