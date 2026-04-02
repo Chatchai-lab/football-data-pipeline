@@ -20,7 +20,7 @@
   </p>
 
   <p>
-    <a href="https://matchlytics.onrender.com"><strong>🚀 Live-Demo →</strong></a>
+    <a href="https://matchlytics.onrender.com"><strong>Live-Demo →</strong></a>
   </p>
 </div>
 
@@ -28,65 +28,21 @@
 
 ## Screenshots
 
-| Liga-Tabelle | Team-Analyse | Saisonverlauf |
+| Landingpage | Liga-Tabelle | Team-Analyse |
 |:---:|:---:|:---:|
-| ![Liga](docs/screenshots/liga_ansicht.png) | ![Team](docs/screenshots/team_analyse.png) | ![Trend](docs/screenshots/saisonverlauf.png) |
+| ![Landingpage](docs/screenshots/Landingpage1.png) | ![Liga](docs/screenshots/liga_ansicht1.png) | ![Team](docs/screenshots/team_analyse1.png) |
 
-| Heim vs. Auswärts | Team-Ratings |
-|:---:|:---:|
-| ![H/A](docs/screenshots/heim_auswaerts.png) | ![Ratings](docs/screenshots/team_ratings.png) |
+| Saisonverlauf | Heim vs. Auswärts | Team-Ratings |
+|:---:|:---:|:---:|
+| ![Trend](docs/screenshots/saisonverlauf1.png) | ![H/A](docs/screenshots/heim_auswaerts1.png) | ![Ratings](docs/screenshots/team_ratings1.png) |
 
 ---
 
 ## Systemarchitektur
 
-```mermaid
-flowchart LR
-    subgraph Source["⚽ Data Source"]
-        API["football-data.org\nREST API"]
-    end
-
-    subgraph Pipeline["⚙️ ELT Pipeline"]
-        direction TB
-        GH["GitHub Actions\n⏰ Nightly 04:00 CET"]
-        PY["Python 3.12\nsrc/main.py"]
-        GH --> PY
-    end
-
-    subgraph Cloud_DB["☁️ Neon PostgreSQL · Frankfurt"]
-        direction TB
-        subgraph Bronze["Bronze Layer"]
-            RAW_M["raw_matches"]
-            RAW_T["raw_teams"]
-        end
-        subgraph Silver["Silver Layer"]
-            STG["stg_matches\nfact_matches\ndim_teams"]
-        end
-        subgraph Gold["Gold Layer"]
-            FCT["fct_standings\nfct_season_trend\nfct_home_away_stats\nfct_team_ratings\nfct_team_form"]
-        end
-        Bronze --> Silver --> Gold
-    end
-
-    subgraph Frontend["📊 Streamlit Dashboard"]
-        direction TB
-        ST["Streamlit + Plotly"]
-        RENDER["Render.com\n🚀 Auto-Deploy"]
-        ST --- RENDER
-    end
-
-    subgraph Monitoring["🔍 Monitoring"]
-        UR["UptimeRobot\nKeyword Check"]
-        LOG["Structured Logging\n+ Health Endpoint"]
-    end
-
-    API -->|"HTTP GET"| PY
-    PY -->|"INSERT\npsycopg2 · SSL"| Bronze
-    Gold -->|"SQL Views"| ST
-    UR -->|"/_stcore/health"| RENDER
-```
-
-> Die vollständige Diagramm-Datei liegt unter [`docs/architecture.md`](docs/architecture.md).
+<div align="center">
+  <img src="docs/architecture/architecture.png" alt="Matchlytics System Architecture" width="100%" />
+</div>
 
 ---
 
@@ -180,14 +136,14 @@ docker compose up -d --build
 
 ---
 
-## 📂 Projektstruktur
+## Projektstruktur
 
 ```
 football-data-pipeline/
 ├── .github/workflows/
 │   └── pipeline.yml          # Nightly ELT via GitHub Actions
 ├── docs/
-│   ├── architecture.md       # Mermaid-Architekturdiagramm
+│   ├── architecture/          # Architekturdiagramm (PNG)
 │   ├── logo/                 # Logo & Favicon
 │   └── screenshots/          # Dashboard-Screenshots
 ├── sql/staging/
@@ -234,5 +190,5 @@ Dieses Projekt dient als Portfolio-Projekt. Datenquelle: [football-data.org](htt
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/Chatchai-lab">Chatchai</a></sub>
+  <sub>Built by <a href="https://github.com/Chatchai-lab">Chatchai</a></sub>
 </div>
