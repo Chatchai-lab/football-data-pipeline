@@ -28,7 +28,12 @@ def get_db_engine():
         db_url += f"?sslmode={sslmode}"
     
     try:
-        engine = create_engine(db_url)
+        engine = create_engine(
+            db_url,
+            pool_pre_ping=True,           # Prüft Verbindung vor Nutzung (hilft bei Neon Cold-Start)
+            pool_recycle=300,              # Recycled Connections alle 5 Min.
+            connect_args={"connect_timeout": 10},  # 10 Sek. Timeout für Neon Wakeup
+        )
         return engine
     except Exception as e:
         print(f"❌ Fehler beim Erstellen der DB-Engine: {e}")

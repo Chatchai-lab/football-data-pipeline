@@ -3,6 +3,7 @@ Zentrale Daten-Lade-Schicht für die Matchlytics-App.
 Alle SQL-Queries und Cache-Funktionen an einem Ort.
 """
 
+import time
 import streamlit as st
 import pandas as pd
 from sqlalchemy import text
@@ -97,7 +98,28 @@ def get_db_status() -> dict:
                 text("SELECT COUNT(DISTINCT season) FROM raw_matches")
             ).scalar() or 0
     except Exception:
-        status["db_online"] = False
+        # Retry einmal – Neon Cloud braucht ggf. einige Sekunden zum Aufwachen
+        try:
+            time.sleep(3)
+            with engine.connect() as conn:
+                status["db_online"] = True
+                row = conn.execute(text(
+                    "SELECT MAX(match_timestamp) AS last_ts FROM stg_matches "
+                    "WHERE status = 'FINISHED'"
+                )).fetchone()
+                if row and row[0]:
+                    status["last_update"] = row[0].strftime("%d.%m.%Y %H:%M")
+                status["match_count"] = conn.execute(
+                    text("SELECT COUNT(*) FROM raw_matches")
+                ).scalar() or 0
+                status["team_count"] = conn.execute(
+                    text("SELECT COUNT(*) FROM raw_teams")
+                ).scalar() or 0
+                status["season_count"] = conn.execute(
+                    text("SELECT COUNT(DISTINCT season) FROM raw_matches")
+                ).scalar() or 0
+        except Exception:
+            status["db_online"] = False
     return status
 
 
