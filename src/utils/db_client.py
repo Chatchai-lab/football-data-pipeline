@@ -16,8 +16,8 @@ def get_db_engine():
     password = quote_plus(os.getenv('DB_PASSWORD', ''))
     name = os.getenv('DB_NAME')
     
-    # Standardport 5433, falls nicht anders in .env definiert
-    port = os.getenv('DB_PORT', '5433')
+    # Standardport 5432, falls nicht oder leer in .env definiert
+    port = os.getenv('DB_PORT') or '5432'
     host = os.getenv('DB_HOST', 'localhost')
     sslmode = os.getenv('DB_SSLMODE', '')
     
