@@ -20,7 +20,7 @@ def get_team_crests() -> dict:
     return dict(zip(df["team_name"], df["crest_url"]))
 
 
-@st.cache_data
+@st.cache_data(ttl=300)
 def get_league_highlights(season: str) -> tuple:
     """Lädt KPI-Daten: Tabellenführer, Heimmacht, Offensiv-König, Formstark."""
     with engine.connect() as conn:
@@ -123,7 +123,7 @@ def get_db_status() -> dict:
     return status
 
 
-@st.cache_data
+@st.cache_data(ttl=300)
 def get_match_schedule(season: str) -> pd.DataFrame:
     """Lädt den kompletten Spielplan einer Saison aus stg_matches."""
     query = text("""

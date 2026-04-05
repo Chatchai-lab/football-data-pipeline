@@ -30,21 +30,21 @@ jobs:
 
     steps:
       # ── 1. Code auschecken ──
-      - name: "📥 Checkout Repository"
+      - name: " Checkout Repository"
         uses: actions/checkout@v4
 
       # ── 2. Python einrichten ──
-      - name: "🐍 Setup Python 3.12"
+      - name: " Setup Python 3.12"
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       # ── 3. Abhängigkeiten installieren ──
-      - name: "📦 Install Dependencies"
+      - name: " Install Dependencies"
         run: pip install --no-cache-dir -r requirements.txt
 
       # ── 4. Pipeline ausführen ──
-      - name: "🚀 Run ELT Pipeline"
+      - name: " Run ELT Pipeline"
         run: python src/main.py
 
       # ── 5. Erfolgsmeldung ──
