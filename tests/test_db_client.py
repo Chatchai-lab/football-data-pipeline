@@ -25,8 +25,8 @@ class TestGetDbEngine:
         assert "test_db" in url_str
         assert "5433" in url_str
 
-    def test_default_port_is_5433(self):
-        """Ohne DB_PORT wird der Standardport 5433 verwendet."""
+    def test_default_port_is_5432(self):
+        """Ohne DB_PORT wird der PostgreSQL-Standardport 5432 verwendet."""
         import os
         env = {
             "DB_USER": "user",
@@ -37,7 +37,20 @@ class TestGetDbEngine:
         with patch.dict("os.environ", env, clear=False):
             os.environ.pop("DB_PORT", None)
             engine = self._call_get_db_engine()
-            assert "5433" in str(engine.url)
+            assert "5432" in str(engine.url)
+
+    def test_empty_port_falls_back_to_default(self):
+        """Ein leeres DB_PORT (z. B. im Container) fällt auf 5432 zurück."""
+        env = {
+            "DB_USER": "user",
+            "DB_PASSWORD": "pass",
+            "DB_NAME": "mydb",
+            "DB_HOST": "localhost",
+            "DB_PORT": "",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            engine = self._call_get_db_engine()
+            assert "5432" in str(engine.url)
 
     def test_engine_returns_not_none(self, mock_db_env):
         """get_db_engine gibt ein Engine-Objekt zurück."""
