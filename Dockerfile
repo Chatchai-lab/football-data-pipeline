@@ -2,11 +2,6 @@
 # Basis: schlankes Python 3.12 Image
 FROM python:3.12-slim
 
-# System-Abhängigkeiten für psycopg2-binary
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
-
 # Arbeitsverzeichnis setzen
 WORKDIR /app
 
@@ -28,8 +23,9 @@ ENV STREAMLIT_SERVER_PORT=8501
 # Port freigeben
 EXPOSE 8501
 
-# Health Check
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+# Health Check (ohne curl: das slim-Image enthaelt es nicht, urllib ist Teil von Python)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3)" || exit 1
 
 # Streamlit starten
 CMD ["streamlit", "run", "src/app.py", "--server.address=0.0.0.0"]
