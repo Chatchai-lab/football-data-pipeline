@@ -4,6 +4,13 @@ import pandas as pd
 from unittest.mock import patch, MagicMock
 
 
+def _no_cache(*args, **kwargs):
+    """Ersatz für st.cache_data: unterstützt @st.cache_data und @st.cache_data(ttl=...)."""
+    if args and callable(args[0]):
+        return args[0]
+    return lambda f: f
+
+
 def test_get_team_crests_returns_dict():
     """get_team_crests gibt ein Dict {team_name: crest_url} zurück."""
     fake_data = pd.DataFrame({
@@ -17,7 +24,7 @@ def test_get_team_crests_returns_dict():
 
     with patch('src.utils.data_loaders.engine', mock_engine), \
          patch('pandas.read_sql', return_value=fake_data), \
-         patch('streamlit.cache_data', lambda f: f):  # Cache deaktivieren
+         patch('streamlit.cache_data', _no_cache):  # Cache deaktivieren
         # Modul neu laden um den Decorator-Cache zu umgehen
         import importlib
         import src.utils.data_loaders as dl
