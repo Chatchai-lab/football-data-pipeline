@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from src.utils.db_client import get_db_engine
+from src.utils.data_loaders import get_teams, get_team_info, get_team_details
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters  # NEU: Filter importieren
 from src.utils.components import render_navbar, render_sidebar_close, get_favicon
@@ -19,11 +19,7 @@ selected_season = filters["season"]
 
 # --- LOKALES TEAM-DROPDOWN ---
 # Wir erlauben es, auf dieser Seite ein anderes Team zu wählen als das globale standard-team
-engine = get_db_engine()
-from sqlalchemy import text
-teams_query = text("SELECT DISTINCT team_name FROM fct_standings WHERE season = :s ORDER BY team_name")
-teams_df = pd.read_sql(teams_query, engine.connect(), params={"s": selected_season})
-team_list = teams_df['team_name'].tolist()
+team_list = get_teams(selected_season)
 
 # Der Standardwert ist das global gewählte Team
 st.markdown("###  Team wechseln")
@@ -33,52 +29,6 @@ selected_team = st.selectbox(
     index=team_list.index(filters["team"]) if filters["team"] in team_list else 0
 )
 
-# --- DATENLADEN ---
-@st.cache_data
-def load_team_info(team_name):
-    from sqlalchemy import text
-    # Hilfsquery für Logo und TLA
-    query = text("SELECT team_name, crest_url, tla FROM dim_teams WHERE team_name = :t")
-    return pd.read_sql(query, engine.connect(), params={"t": team_name})
-
-@st.cache_data
-def load_team_details(team_name: str, season: str):
-    from sqlalchemy import text
-    # Alle Queries nutzen nun zusätzlich das Season-Feld
-    params = {"team_name": team_name, "season": season}
-
-    form_query = text("""
-        SELECT form_trend
-        FROM fct_team_form
-        WHERE team_name = :team_name AND season = :season
-    """)
-
-    ratings_query = text("""
-        SELECT *
-        FROM fct_team_ratings
-        WHERE team_name = :team_name AND season = :season
-    """)
-
-    trends_query = text("""
-        SELECT matchday, cumulative_points
-        FROM fct_season_trend
-        WHERE team_name = :team_name AND season = :season
-        ORDER BY matchday
-    """)
-
-    home_away_query = text("""
-        SELECT *
-        FROM fct_home_away_stats
-        WHERE team_name = :team_name AND season = :season
-    """)
-
-    with engine.connect() as conn:
-        form = pd.read_sql(form_query, conn, params=params)
-        ratings = pd.read_sql(ratings_query, conn, params=params)
-        trends = pd.read_sql(trends_query, conn, params=params)
-        home_away = pd.read_sql(home_away_query, conn, params=params)
-
-    return form, ratings, trends, home_away
 
 # --- HILFSFUNKTIONEN (Form-Badges etc. bleiben gleich) ---
 def parse_form_trend(form_str: str) -> list[str]:
@@ -93,7 +43,7 @@ def render_form_badges(results: list[str]):
     st.markdown(html, unsafe_allow_html=True)
 
 # --- HEADER BEREICH ---
-df_team_meta = load_team_info(selected_team)
+df_team_meta = get_team_info(selected_team)
 if not df_team_meta.empty:
     team_info = df_team_meta.iloc[0]
     col_logo, col_text = st.columns([1, 5])
@@ -106,7 +56,7 @@ else:
     st.title(f"Team-Analyse: {selected_team}")
 
 # --- DETAILDATEN LADEN ---
-df_form, df_ratings, df_trends, df_ha = load_team_details(selected_team, selected_season)
+df_form, df_ratings, df_trends, df_ha = get_team_details(selected_team, selected_season)
 
 st.divider()
 

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from src.utils.db_client import get_db_engine
+from src.utils.data_loaders import get_ratings, get_team_crests
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
 from src.utils.components import render_navbar, render_sidebar_close, get_favicon
@@ -13,34 +13,11 @@ apply_custom_style()
 render_navbar(is_landing=False)
 render_sidebar_close()
 filters = get_global_filters()
-engine = get_db_engine()
-
 # --- DATENLADEN ---
-@st.cache_data
-def load_rating_data(season):
-    from sqlalchemy import text
-    query = text("SELECT * FROM fct_team_ratings WHERE season = :s")
-    with engine.connect() as conn:
-        df = pd.read_sql(query, conn, params={"s": season})
-    
-    # Performance Score berechnen
-    if 'goals_per_game' in df.columns and 'goals_conceded_per_game' in df.columns:
-        df['performance_score'] = df['goals_per_game'] - df['goals_conceded_per_game']
-    else:
-        df['performance_score'] = 0
-    return df
-
-df_ratings = load_rating_data(filters["season"])
+df_ratings = get_ratings(filters["season"])
 
 # --- TEAM-WAPPEN LADEN ---
-@st.cache_data
-def load_team_crests():
-    from sqlalchemy import text
-    with engine.connect() as conn:
-        df = pd.read_sql(text("SELECT team_name, crest_url FROM dim_teams"), conn)
-    return dict(zip(df['team_name'], df['crest_url']))
-
-crests = load_team_crests()
+crests = get_team_crests()
 
 # --- TITEL & BESCHREIBUNG ---
 st.title(f" Team-Rating & Leistungsanalyse ({filters['season']})")

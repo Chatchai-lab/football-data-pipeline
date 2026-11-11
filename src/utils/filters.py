@@ -1,16 +1,12 @@
 import streamlit as st
-import pandas as pd
-from src.utils.db_client import get_db_engine
-
-engine = get_db_engine()
+from src.utils.data_loaders import get_seasons, get_teams
 
 def get_global_filters():
     # Close-Button (×) wird per JS in style.py injiziert
     st.sidebar.header("Globale Filter")
     
     # 1. Saisons dynamisch aus dem neuen View laden
-    seasons_df = pd.read_sql("SELECT DISTINCT season FROM fct_standings ORDER BY season DESC", engine)
-    season_list = seasons_df['season'].tolist()
+    season_list = get_seasons()
     
     # Helfer-Funktion für die Anzeige (2025 -> Saison 2025/26)
     def format_season(s):
@@ -35,10 +31,7 @@ def get_global_filters():
     st.session_state['global_season'] = selected_season
     
     # 2. Teams passend zur gewählten Saison laden
-    from sqlalchemy import text
-    teams_query = text("SELECT DISTINCT team_name FROM fct_standings WHERE season = :s ORDER BY team_name")
-    teams_df = pd.read_sql(teams_query, engine.connect(), params={"s": selected_season})
-    team_list = teams_df['team_name'].tolist()
+    team_list = get_teams(selected_season)
     
     if 'global_team' not in st.session_state and team_list:
         st.session_state['global_team'] = team_list[0]

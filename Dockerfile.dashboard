@@ -1,0 +1,42 @@
+# ─── Matchlytics Dashboard (spricht nur mit der API) ───
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Zuerst nur die Abhaengigkeiten kopieren (Layer-Cache)
+COPY requirements-dashboard.txt .
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
+
+# Nur Code und Bilder, die das Dashboard braucht.
+# Bewusst ohne db_client.py: Dieses Image hat keinen Datenbankzugriff.
+COPY src/__init__.py src/__init__.py
+COPY src/app.py src/app.py
+COPY src/pages/ src/pages/
+COPY src/utils/__init__.py src/utils/__init__.py
+COPY src/utils/api_client.py src/utils/api_client.py
+COPY src/utils/components.py src/utils/components.py
+COPY src/utils/data_loaders.py src/utils/data_loaders.py
+COPY src/utils/filters.py src/utils/filters.py
+COPY src/utils/style.py src/utils/style.py
+COPY docs/logo/ docs/logo/
+
+# PYTHONPATH setzen, damit src/ Imports funktionieren
+ENV PYTHONPATH=/app
+
+# Streamlit-Konfiguration: Telemetrie aus, Server-Einstellungen
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ENV STREAMLIT_SERVER_HEADLESS=true
+ENV STREAMLIT_SERVER_PORT=8501
+
+# Kein Root im Container. Streamlit legt Dateien im Home-Verzeichnis an, deshalb --create-home.
+RUN useradd --uid 10001 --create-home appuser
+USER appuser
+
+EXPOSE 8501
+
+# Health Check ohne curl (siehe Issue 18)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3)" || exit 1
+
+# API_URL wird zur Laufzeit gesetzt, z. B. http://api:8000
+CMD ["streamlit", "run", "src/app.py", "--server.address=0.0.0.0"]
