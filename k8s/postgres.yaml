@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: matchlytics
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  # Recreate: erst den alten Pod beenden, dann den neuen starten.
+  # Zwei Pods duerfen nie gleichzeitig dieselben Datenbankdateien schreiben.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: matchlytics-secrets
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: matchlytics-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: matchlytics-config
+                  key: DB_NAME
+            # Unterordner, weil ein frisch eingebundenes Volume ein lost+found enthalten kann
+            # und initdb in ein nicht leeres Verzeichnis nicht initialisiert.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data

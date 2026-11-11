@@ -118,3 +118,60 @@ Beobachtet mit `kubectl patch configmap ... LOG_LEVEL=DEBUG` und einem laufenden
 | Als Datei eingebundenes Volume | Wird nach etwa einer Minute im laufenden Pod aktualisiert (`DEBUG`). Die Anwendung muss die Datei aber selbst neu lesen. |
 
 Die Datei `k8s/configmap.yaml` ist der Sollzustand. Eine Änderung per `patch` gilt nur im Cluster und wird mit `kubectl apply -f k8s/configmap.yaml` wieder überschrieben.
+
+
+## PostgreSQL im Cluster
+
+Für Entwicklung und CI läuft eine eigene PostgreSQL im Cluster, die Produktion bleibt bei Neon. Dateien: `k8s/postgres-pvc.yaml`, `k8s/postgres.yaml`, `k8s/postgres-service.yaml`.
+
+### Bausteine
+
+| Ressource | Aufgabe |
+|---|---|
+| **PersistentVolumeClaim (PVC)** | Antrag auf Speicher (`1Gi`, `ReadWriteOnce`). Ohne `storageClassName` gilt die Standardklasse `local-path`. |
+| **PersistentVolume (PV)** | Der tatsächlich angelegte Speicher. `local-path` erzeugt ihn automatisch als Ordner unter `/var/lib/rancher/k3s/storage/` auf dem Node. |
+| **Deployment** | Beschreibt, wie Postgres läuft: `postgres:15`, `replicas: 1`, Volume auf `/var/lib/postgresql/data`. |
+| **Service `postgres`** | Stabiler Name und feste IP (`ClusterIP`, Port 5432) für den Pod, der das Label `app: postgres` trägt. |
+
+Das PVC bleibt `Pending`, bis ein Pod es nutzt (`WaitForFirstConsumer`), dann wird es `Bound`.
+
+### Wichtige Einstellungen
+
+- **`strategy: Recreate`**: Bei einer Änderung wird der alte Pod erst beendet, dann startet der neue. Zwei Postgres-Prozesse dürfen nie gleichzeitig dieselben Dateien beschreiben, ein `RollingUpdate` würde das kurz zulassen.
+- **`PGDATA` auf einen Unterordner** (`/var/lib/postgresql/data/pgdata`): Ein neu eingebundenes Volume kann ein Verzeichnis `lost+found` enthalten, und `initdb` initialisiert nicht in einem nicht leeren Ordner.
+- **Zugangsdaten**: Postgres erwartet `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB`. Mit `valueFrom` (`secretKeyRef` bzw. `configMapKeyRef`) werden `DB_USER`, `DB_PASSWORD` und `DB_NAME` einzeln auf diese Namen abgebildet. Das Passwort steht nie im YAML.
+
+### Service und DNS
+
+Pods bekommen bei jedem Neustart eine neue IP. Der Service gibt der Datenbank einen festen Namen. CoreDNS löst ihn auf, der volle Name lautet `postgres.matchlytics.svc.cluster.local`. Im selben Namespace genügt `postgres`, aus einem anderen Namespace `postgres.matchlytics`. Das ist der Wert `DB_HOST=postgres` aus der ConfigMap.
+
+Jeder Pod hat Suchdomänen (`matchlytics.svc.cluster.local`, `svc.cluster.local`, `cluster.local`) und probiert sie der Reihe nach durch. Die `NXDOMAIN`-Zeilen bei `nslookup` sind deshalb normal, entscheidend ist die Zeile mit der gefundenen IP.
+
+```bash
+kubectl run dns-test --rm -it --image=busybox:1.36 --restart=Never -n matchlytics -- nslookup postgres
+kubectl run pg-test --rm -it --image=postgres:15 --restart=Never -n matchlytics -- pg_isready -h postgres -p 5432
+```
+
+### Was passiert mit den Daten?
+
+| Aktion | Daten |
+|---|---|
+| Pod löschen | bleiben (das Deployment startet einen neuen Pod mit demselben PVC) |
+| Deployment löschen | bleiben (das PVC ist eine eigene Ressource) |
+| **PVC löschen** | **weg**: Die Reclaim Policy `Delete` entfernt PV und Ordner. Bei `Retain` bliebe der Ordner und müsste von Hand gelöscht werden. |
+
+Die Daten liegen nur auf diesem einen Node. Wird k3s deinstalliert oder `/var/lib/rancher/k3s` gelöscht, sind sie verloren.
+
+Beobachtung: `kubectl rollout status` meldet nach dem Start sofort Erfolg, obwohl Postgres auf einem neuen Volume noch einige Sekunden initialisiert (`psql` scheitert dann mit `No such file or directory`). Kubernetes weiß ohne Readiness-Probe nicht, ob die Datenbank schon Verbindungen annimmt. Das wird mit den Probes in Issue 26 behoben.
+
+### Deployment oder StatefulSet?
+
+Ein Deployment behandelt alle Pods als austauschbar. Für eine Datenbank mit einem Volume und einer Replika reicht das. Bei mehreren Replikas fehlen ihm:
+
+- **Stabile Identität**: Ein StatefulSet gibt Pods feste Namen (`postgres-0`, `postgres-1`) und feste DNS-Namen.
+- **Eigenes Volume pro Pod** (`volumeClaimTemplates`): Jeder Pod bekommt seinen eigenen Speicher, statt alle dasselbe PVC zu teilen.
+- **Geordneter Start und Stopp**: Pods starten und enden nacheinander.
+
+`replicas: 2` würde mit einem Deployment keine hochverfügbare Datenbank ergeben: Beide Pods würden auf dasselbe Volume zeigen (bei `ReadWriteOnce` startet der zweite nicht einmal sauber), und selbst mit getrennten Volumes wüssten die Datenbanken nichts voneinander. Es gäbe keine Replikation. Dafür braucht man eine Replikationslösung, etwa einen Operator wie CloudNativePG, oder einen Anbieter.
+
+Die Produktionsdatenbank bleibt deshalb bei Neon: Backups, Hochverfügbarkeit, Updates und Wiederherstellung sind dort Aufgabe des Anbieters, der Cluster-Postgres dient nur der Entwicklung und der CI.
