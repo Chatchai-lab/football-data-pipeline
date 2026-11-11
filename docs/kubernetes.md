@@ -67,3 +67,54 @@ k3s legt seinen Zustand unter `/var/lib/rancher/k3s` ab: Datenbank, Zertifikate,
 | **kind** | "Kubernetes in Docker": der Standard-Kubernetes, jeder Node ein Docker-Container | In Docker | Kubernetes selbst und Tools dafür testen |
 
 **Warum k3s lokal und k3d in der CI?** Lokal soll der Cluster dauerhaft laufen und Daten behalten, deshalb k3s als Systemdienst. In der CI braucht jeder Lauf einen frischen, sauberen Cluster, der danach wieder verschwindet. k3d startet dafür dieselbe k3s-Distribution in Docker, das Verhalten bleibt also vergleichbar.
+
+## Konfiguration: ConfigMap und Secret
+
+Matchlytics liest seine Einstellungen aus Umgebungsvariablen. In Kubernetes werden sie nicht ins Image gebaut, sondern beim Start in den Pod eingespielt. Dabei trennt man zwei Arten:
+
+| | ConfigMap | Secret |
+|---|---|---|
+| Inhalt | Normale Einstellungen (`LOG_LEVEL`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `API_URL`) | Geheimnisse (`DB_USER`, `DB_PASSWORD`, `FOOTBALL_API_KEY`) |
+| Datei im Repo | `k8s/configmap.yaml` | nur `k8s/secret.example.yaml` mit Platzhaltern |
+| Im Git? | ja | **nie** das echte Secret (`k8s/secret.yaml` steht in `.gitignore`) |
+
+Das echte Secret entsteht lokal aus einer Datei außerhalb des Repos, mit eigenen Werten für den Cluster (nicht die der Produktion):
+
+```bash
+kubectl create secret generic matchlytics-secrets --from-env-file=$HOME/matchlytics-cluster.env -n matchlytics
+```
+
+### Base64 ist kein Schutz
+
+Ein Secret speichert seine Werte nur Base64-kodiert, nicht verschlüsselt. Jeder, der es lesen darf, dekodiert es sofort:
+
+```bash
+kubectl get secret matchlytics-secrets -n matchlytics -o jsonpath='{.data.DB_USER}' | base64 -d
+```
+
+Der Vorteil eines Secrets liegt woanders: Die Werte stehen nicht im Image und nicht im Git, und der Zugriff lässt sich getrennt von der ConfigMap steuern (RBAC). Wer Secrets lesen darf, bestimmt man über Rollen im Cluster. Zum sicheren Verwalten im Git gibt es Werkzeuge wie Sealed Secrets oder SOPS.
+
+### Werte in den Pod bringen
+
+Mit `envFrom` wird jeder Eintrag einer ConfigMap oder eines Secrets zu einer Umgebungsvariable:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: matchlytics-config
+  - secretRef:
+      name: matchlytics-secrets
+```
+
+Einzelne Werte lassen sich mit `valueFrom` auswählen. `k8s/debug-pod.yaml` ist ein Wegwerf-Pod, um das zu prüfen (`kubectl exec debug -n matchlytics -- env`). Er bleibt nicht dauerhaft im Cluster.
+
+### Was passiert bei einer Änderung?
+
+Beobachtet mit `kubectl patch configmap ... LOG_LEVEL=DEBUG` und einem laufenden Pod:
+
+| Einbindung | Nach der Änderung |
+|---|---|
+| Umgebungsvariable (`envFrom`) | Bleibt beim alten Wert (`INFO`). Der Wert wird beim Start des Containers festgelegt, erst ein Neustart des Pods übernimmt den neuen. |
+| Als Datei eingebundenes Volume | Wird nach etwa einer Minute im laufenden Pod aktualisiert (`DEBUG`). Die Anwendung muss die Datei aber selbst neu lesen. |
+
+Die Datei `k8s/configmap.yaml` ist der Sollzustand. Eine Änderung per `patch` gilt nur im Cluster und wird mit `kubectl apply -f k8s/configmap.yaml` wieder überschrieben.

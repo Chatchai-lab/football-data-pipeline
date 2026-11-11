@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: matchlytics-config
+  namespace: matchlytics
+data:
+  LOG_LEVEL: "INFO"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "matchlytics"
+  # Leer: die Postgres im Cluster nutzt kein SSL (db_client haengt nur bei gesetztem Wert sslmode an)
+  DB_SSLMODE: ""
+  API_URL: "http://api"

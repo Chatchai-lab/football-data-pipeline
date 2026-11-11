@@ -7,3 +7,6 @@ venv/
 .venv/
 __pycache__/
 .env
+
+# Kubernetes: echte Secrets nie committen
+k8s/secret.yaml
