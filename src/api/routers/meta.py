@@ -3,7 +3,7 @@ from sqlalchemy import Connection, text
 
 from src.api.deps import get_db
 from src.api.params import Season, require_season
-from src.api.schemas import StatusResponse
+from src.api.schemas import StatusResponse, TeamMeta
 
 router = APIRouter(tags=["Stammdaten"])
 
@@ -49,3 +49,12 @@ def get_teams(season: Season, conn: Connection = Depends(get_db)) -> list[str]:
         {"s": season},
     ).scalars().all()
     return list(rows)
+
+
+@router.get("/team-meta", response_model=list[TeamMeta])
+def get_team_meta(conn: Connection = Depends(get_db)) -> list[dict]:
+    """Stammdaten aller Teams (Kuerzel und Wappen), unabhaengig von der Saison."""
+    rows = conn.execute(
+        text("SELECT team_name, tla, crest_url FROM dim_teams ORDER BY team_name")
+    ).mappings().all()
+    return [dict(row) for row in rows]

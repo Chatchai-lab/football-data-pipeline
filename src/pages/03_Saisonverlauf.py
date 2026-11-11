@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go 
-from src.utils.db_client import get_db_engine
+from src.utils.data_loaders import get_season_trends, get_team_crests
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
 from src.utils.components import render_navbar, render_sidebar_close, get_favicon
@@ -13,34 +13,11 @@ apply_custom_style()
 render_navbar(is_landing=False)
 render_sidebar_close()
 filters = get_global_filters()
-engine = get_db_engine()
-
 # --- DATENLADEN ---
-@st.cache_data
-def load_trend_data(season):
-    from sqlalchemy import text
-    query = text("""
-        SELECT matchday, team_name, cumulative_points 
-        FROM fct_season_trend 
-        WHERE season = :s
-        ORDER BY matchday ASC
-    """)
-    with engine.connect() as conn:
-        df = pd.read_sql(query, conn, params={"s": season})
-    df['matchday'] = pd.to_numeric(df['matchday'])
-    return df
-
-df_all_trends = load_trend_data(filters["season"])
+df_all_trends = get_season_trends(filters["season"])
 
 # --- TEAM-WAPPEN LADEN ---
-@st.cache_data
-def load_team_crests():
-    from sqlalchemy import text
-    with engine.connect() as conn:
-        df = pd.read_sql(text("SELECT team_name, crest_url FROM dim_teams"), conn)
-    return dict(zip(df['team_name'], df['crest_url']))
-
-crests = load_team_crests()
+crests = get_team_crests()
 
 # --- TITEL ---
 st.title(f" Saisonverlauf & Team-Vergleich ({filters['season']})")

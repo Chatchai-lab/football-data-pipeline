@@ -20,6 +20,9 @@ class FakeMappings(list):
     def first(self):
         return self[0] if self else None
 
+    def all(self):
+        return list(self)
+
 
 class FakeResult:
     """Ersetzt das Ergebnis von conn.execute(...) mit den Methoden, die die API nutzt."""
@@ -167,6 +170,14 @@ def test_teams(api):
     response = client.get("/teams", params={"season": "2026"})
     assert response.status_code == 200
     assert response.json() == ["A", "B"]
+
+
+def test_team_meta(api):
+    rows = [{"team_name": "FC Test", "tla": "FCT", "crest_url": "https://example.org/fct.png"}]
+    client = api({"SELECT team_name, tla, crest_url FROM dim_teams": rows})
+    response = client.get("/team-meta")
+    assert response.status_code == 200
+    assert response.json() == rows
 
 
 # --- Gold-Views ------------------------------------------------------------

@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from src.utils.db_client import get_db_engine
+from src.utils.data_loaders import get_standings
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
 from src.utils.components import render_navbar, render_sidebar_close, get_favicon
@@ -13,23 +13,7 @@ render_navbar(is_landing=False)
 render_sidebar_close()
 filters = get_global_filters()
 
-engine = get_db_engine()
-
-@st.cache_data
-def get_league_data(season_val):
-    from sqlalchemy import text
-    query = text("""
-    SELECT 
-        s.*, 
-        t.crest_url 
-    FROM fct_standings s
-    JOIN dim_teams t ON s.team_name = t.team_name
-    WHERE s.season = :season_param
-    ORDER BY s.total_points DESC, s.goal_diff DESC
-    """)
-    return pd.read_sql(query, engine.connect(), params={"season_param": season_val})
-
-df = get_league_data(filters["season"])
+df = get_standings(filters["season"])
 
 # --- TITEL ---
 st.title(f" Bundesliga Liga-Übersicht - Saison {filters['season']}")

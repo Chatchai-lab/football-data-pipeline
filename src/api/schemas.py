@@ -95,6 +95,12 @@ class FormKing(BaseModel):
     form_trend: str
 
 
+class TeamMeta(BaseModel):
+    team_name: str
+    tla: str | None
+    crest_url: str | None
+
+
 class HighlightsResponse(BaseModel):
     leader: LeagueLeader | None
     home_king: HomeKing | None

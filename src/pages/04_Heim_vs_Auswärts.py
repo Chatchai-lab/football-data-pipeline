@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from src.utils.db_client import get_db_engine
+from src.utils.data_loaders import get_home_away
 from src.utils.style import apply_custom_style
 from src.utils.filters import get_global_filters
 from src.utils.components import render_navbar, render_sidebar_close, get_favicon
@@ -13,25 +13,8 @@ apply_custom_style()
 render_navbar(is_landing=False)
 render_sidebar_close()
 filters = get_global_filters()
-engine = get_db_engine()
-
-# --- DATENLADEN (MIT LOGO JOIN) ---
-@st.cache_data
-def load_ha_data_with_crests(season):
-    from sqlalchemy import text
-    query = text("""
-        SELECT 
-            ha.*, 
-            t.crest_url, 
-            t.tla
-        FROM fct_home_away_stats ha
-        JOIN dim_teams t ON ha.team_name = t.team_name
-        WHERE ha.season = :s
-    """)
-    with engine.connect() as conn:
-        return pd.read_sql(query, conn, params={"s": season})
-
-df_ha = load_ha_data_with_crests(filters["season"])
+# --- DATENLADEN (inkl. Wappen und Kürzel) ---
+df_ha = get_home_away(filters["season"])
 
 # --- HEADER (MIT LOGO) ---
 selected_team = filters["team"]

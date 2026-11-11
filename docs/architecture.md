@@ -155,3 +155,74 @@ docker save matchlytics-api:dev | sudo k3s ctr images import -
 ### Was gewinnt und kostet die API?
 
 Die Zugriffsregeln und das SQL liegen an einem Ort, das Dashboard braucht keine Datenbank-Zugangsdaten mehr, die Rechte lassen sich einschränken (`api_ro`), und weitere Clients können dieselben Daten abrufen. Der Preis: ein Dienst mehr, der betrieben und überwacht werden muss, und ein zusätzlicher Netzwerkschritt, der Latenz bringt.
+
+## Dashboard und Datenzugriff
+
+Das Dashboard holt seine Daten ausschließlich über `src/utils/data_loaders.py`. Die Seiten und `filters.py` enthalten keinen Datenbankzugriff mehr.
+
+```
+Seiten  ->  data_loaders.py  ->  api_client.py  ->  API  ->  Datenbank
+                  |
+                  +-> (ohne API_URL) direkt die Datenbank, wie bisher
+```
+
+### Zwei Betriebsarten
+
+| | Mit `API_URL` | Ohne `API_URL` |
+|---|---|---|
+| Datenquelle | Matchlytics-API | direkt die Datenbank |
+| Einsatz | Kubernetes-Cluster, Docker Compose | Produktion auf Render mit Neon |
+| Image / Abhängigkeiten | `Dockerfile.dashboard`, `requirements-dashboard.txt` (ohne SQLAlchemy und psycopg2) | `Dockerfile`, `requirements.txt` |
+| `DB_*`-Variablen | nicht nötig | nötig |
+
+Der Schalter ist `api_client.is_enabled()`. Beide Wege liefern dieselben Spalten und Typen. Mit `API_URL` wird `db_client` und damit SQLAlchemy nie importiert, der direkte Zugriff lädt die Engine erst bei der ersten Abfrage. Geprüft wurde die Gleichheit mit allen Ladefunktionen und allen vier Saisons gegen dieselbe Datenbank: Die Ergebnisse waren Zelle für Zelle identisch.
+
+Die Produktion auf Render bleibt unverändert, weil dort `API_URL` nicht gesetzt ist. Deshalb wurden `Dockerfile` und `requirements.txt` nicht umbenannt oder geändert.
+
+### API-Client und Fehlerbehandlung
+
+`src/utils/api_client.py` hat eine Funktion pro Endpoint, 10 Sekunden Timeout und bis zu zwei Wiederholungen bei vorübergehenden Fehlern (Verbindungsfehler, Timeout, 502, 503, 504). Ein `404` wird nicht wiederholt und als `ApiNotFound` gemeldet, alle anderen Fehler als `ApiError` mit einem verständlichen Satz.
+
+Der Decorator `api_guard` in `data_loaders.py` zeigt bei einem `ApiError` eine Meldung ("Die Daten sind gerade nicht verfügbar. ...") und stoppt die Seite, statt einen Stacktrace zu zeigen. Er liegt außen um die gecachte Funktion, weil Streamlit Ausnahmen nicht zwischenspeichert. Der Status im Footer ist ausgenommen und zeigt bei einem Fehler nur "Offline".
+
+### Caches
+
+| Ebene | Cache | Wirkung |
+|---|---|---|
+| Dashboard | `st.cache_data(ttl=300)` auf allen Ladefunktionen | Ergebnisse bleiben höchstens fünf Minuten gültig |
+| API | keiner | jede Anfrage liest die Datenbank |
+| Datenbank | Views, keine Zwischenspeicherung | immer der aktuelle Stand |
+
+Für frische Daten nach der nächtlichen Pipeline zählt allein der Cache im Dashboard: Neue Daten sind nach spätestens fünf Minuten sichtbar.
+
+### Reihenfolge beim Deployment
+
+Erst die API, dann das Dashboard. Ein Dashboard mit `API_URL`, dessen API noch nicht läuft, zeigt auf jeder Seite nur die Fehlermeldung. Wäre die Produktion zuerst umgestellt worden, wäre sie ausgefallen. Mit der zweiten Betriebsart bleibt sie unberührt, bis es dort eine API gibt.
+
+### Warum die Datenbank nur von der API aus erreichbar sein sollte
+
+Die Zugangsdaten liegen nur noch an einer Stelle (bei der API, mit der Read-only-Rolle `api_ro`), das Dashboard-Image enthält weder Datenbankpakete noch Zugangsdaten, und die Angriffsfläche ist kleiner. Im Cluster lässt sich der Datenbankzugriff später auf die API beschränken.
+
+### Lokal starten
+
+```bash
+# API (mit Port-Forward auf die Datenbank im Cluster)
+kubectl port-forward svc/postgres 5434:5432 -n matchlytics
+DB_USER=api_ro DB_PASSWORD="$API_RO_PASSWORD" DB_HOST=localhost DB_PORT=5434 \
+  DB_NAME=matchlytics DB_SSLMODE= .venv/bin/uvicorn src.api.main:app --reload
+
+# Dashboard, nur mit API_URL und ohne DB-Zugangsdaten
+env -i HOME="$HOME" PATH="$PATH" PYTHONPATH="$PWD" API_URL=http://localhost:8000 \
+  .venv/bin/streamlit run src/app.py --server.address 127.0.0.1
+```
+
+`PYTHONPATH` wird gebraucht, weil die Seiten `from src.utils...` importieren.
+
+Mit Docker Compose:
+
+```bash
+docker compose up --build                  # api und dashboard (API_URL=http://api:8000)
+docker compose --profile legacy up app     # bisheriger Einzelcontainer mit direktem DB-Zugriff
+```
+
+Der Dienst `api` liest die Datenbank-Zugangsdaten aus `.env`. Zeigt sie auf Neon, liest die API dort. Für den lokalen Betrieb sollten eigene Werte gesetzt werden.
