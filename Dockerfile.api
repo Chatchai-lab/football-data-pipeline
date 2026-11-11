@@ -1,0 +1,27 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Zuerst nur die Abhaengigkeiten kopieren (Layer-Cache)
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# Nur den Code, den die API braucht
+COPY src/__init__.py src/__init__.py
+COPY src/utils/__init__.py src/utils/__init__.py
+COPY src/utils/db_client.py src/utils/db_client.py
+COPY src/api/ src/api/
+
+ENV PYTHONPATH=/app
+
+# Kein Root im Container
+RUN useradd --uid 10001 --no-create-home appuser
+USER appuser
+
+EXPOSE 8000
+
+# Health Check ohne curl (siehe Issue 18)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)" || exit 1
+
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
