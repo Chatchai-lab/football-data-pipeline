@@ -2,4 +2,7 @@ streamlit==1.35.0
 plotly==5.22.0
 pandas==2.2.3
 numpy==1.26.4
+# pyarrow >= 26 verlangt NumPy 2, streamlit 1.35 verlangt aber numpy<2 und erlaubt jedes pyarrow >= 7.
+# Ohne diese Zeile holt ein frischer Build die neueste Version und st.dataframe bricht.
+pyarrow==23.0.1
 requests==2.32.5
