@@ -21,3 +21,5 @@ docker-compose.yml
 *.md
 *.log
 .env
+# Keine Datendateien ins Image (wird spaeter oeffentlich gepusht)
+seed/

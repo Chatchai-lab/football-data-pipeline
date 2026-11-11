@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Zuerst nur die Abhaengigkeiten kopieren (Layer-Cache)
+COPY requirements-pipeline.txt .
+RUN pip install --no-cache-dir -r requirements-pipeline.txt
+
+# Nur den Code, den Ingestion, Transformation und Init brauchen
+COPY src/__init__.py src/__init__.py
+COPY src/utils/ src/utils/
+COPY src/ingestion/ src/ingestion/
+COPY src/transformation/ src/transformation/
+COPY src/seed/ src/seed/
+COPY sql/ sql/
+
+ENV PYTHONPATH=/app
+
+# Kein Root im Container
+RUN useradd --uid 10001 --no-create-home appuser
+USER appuser
+
+CMD ["python", "-m", "src.seed.init_db"]
