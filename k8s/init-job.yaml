@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-db
+  namespace: matchlytics
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -p 5432; do echo "warte auf postgres ..."; sleep 2; done
+      containers:
+        - name: init-db
+          image: matchlytics-pipeline:dev
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: matchlytics-config
+            - secretRef:
+                name: matchlytics-secrets

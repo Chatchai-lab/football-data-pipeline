@@ -175,3 +175,59 @@ Ein Deployment behandelt alle Pods als austauschbar. Für eine Datenbank mit ein
 `replicas: 2` würde mit einem Deployment keine hochverfügbare Datenbank ergeben: Beide Pods würden auf dasselbe Volume zeigen (bei `ReadWriteOnce` startet der zweite nicht einmal sauber), und selbst mit getrennten Volumes wüssten die Datenbanken nichts voneinander. Es gäbe keine Replikation. Dafür braucht man eine Replikationslösung, etwa einen Operator wie CloudNativePG, oder einen Anbieter.
 
 Die Produktionsdatenbank bleibt deshalb bei Neon: Backups, Hochverfügbarkeit, Updates und Wiederherstellung sind dort Aufgabe des Anbieters, der Cluster-Postgres dient nur der Entwicklung und der CI.
+
+
+## Init-Job: Datenbank vorbereiten
+
+Die Postgres im Cluster ist anfangs leer. Der Job `init-db` (`k8s/init-job.yaml`) bereitet sie vor: Er legt die Rohtabellen `raw_teams` und `raw_matches` an, baut mit `transform_data()` die Silver- und Gold-Views und legt die Read-only-Rolle `api_ro` an. Code: `src/seed/init_db.py`, Image: `Dockerfile.pipeline` mit `requirements-pipeline.txt`.
+
+### Image
+
+Das Image enthält nur Ingestion, Transformation, Hilfsfunktionen und `sql/`, kein Streamlit, und läuft nicht als Root (`USER appuser`, UID 10001). Es ist mit 316 MB deutlich kleiner als das Dashboard-Image (723 MB). Weil k3s `containerd` nutzt und Docker-Images nicht sieht, wird es per Hand importiert:
+
+```bash
+docker build -f Dockerfile.pipeline -t matchlytics-pipeline:dev .
+docker save matchlytics-pipeline:dev | sudo k3s ctr images import -
+```
+
+### Job und Deployment
+
+Ein **Deployment** hält einen Dienst dauerhaft am Leben. Ein **Job** führt eine Aufgabe **zu Ende** und beendet sich. Der Init-Job soll einmal laufen und fertig sein.
+
+| Einstellung | Wirkung |
+|---|---|
+| `initContainers` | Läuft vor dem Hauptcontainer und muss zuerst fertig sein. Hier wartet `pg_isready`, bis Postgres Verbindungen annimmt ("warte, bis die Abhängigkeit bereit ist"). |
+| `restartPolicy: Never` | Ein fehlgeschlagener Container wird nicht im selben Pod neu gestartet, sondern es entsteht bei Bedarf ein neuer Pod. Der alte bleibt für die Logs bestehen. |
+| `backoffLimit: 3` | Nach 3 Wiederholungen (insgesamt 4 Pods) gibt Kubernetes auf, der Job ist `Failed`. |
+| `ttlSecondsAfterFinished: 3600` | Eine Stunde nach dem Ende wird der Job samt Pods automatisch gelöscht. |
+| `envFrom` | Alle Einträge aus ConfigMap und Secret werden zu Umgebungsvariablen. |
+
+Ein fertiger Job läuft nicht erneut und sein Pod-Template ist unveränderlich. Zum Wiederholen löscht man ihn und wendet ihn neu an:
+
+```bash
+kubectl delete job init-db -n matchlytics
+kubectl apply -f k8s/init-job.yaml
+kubectl logs job/init-db -n matchlytics
+```
+
+Beobachteter Fehlerfall (falsches `DB_PASSWORD`): Es entstanden vier Pods, jeder endete in `Error` (`FATAL: password authentication failed`), danach war der Job `Failed`.
+
+### Idempotenz
+
+Das Skript darf beliebig oft laufen. `CREATE TABLE IF NOT EXISTS` lässt vorhandene Tabellen samt Daten in Ruhe, die Views werden mit `DROP VIEW ... CASCADE` und `CREATE` neu gebaut, die Rolle wird angelegt oder per `ALTER ROLE` aktualisiert. Ein zweiter Lauf erzeugt keine Dubletten.
+
+Wichtig: `DROP VIEW` entfernt auch die Rechte auf der View. Deshalb vergibt das Skript die Rechte **zuletzt**, und nach jedem Lauf von `transform_data()` müssen sie neu vergeben werden (zum Beispiel durch erneutes Ausführen des Init-Jobs).
+
+### Least Privilege: die Rolle `api_ro`
+
+Die API soll nur lesen. Die Rolle `api_ro` bekommt `CONNECT`, `USAGE` auf das Schema und `SELECT` auf genau diese Objekte: `fct_standings`, `fct_season_trend`, `fct_team_form`, `fct_home_away_stats`, `fct_team_ratings`, `dim_teams` und `stg_matches`. Geprüft als `api_ro`: `SELECT` auf eine View klappt, `INSERT` (`permission denied`), `DROP VIEW` (`must be owner`) und ein Lesen der Rohtabellen (`permission denied`) scheitern. Wird die API gehackt, kann der Angreifer nichts verändern oder löschen, und der Admin-Benutzer bleibt unberührt.
+
+Sicherheitsnetz: `check_target()` bricht ab, wenn `DB_HOST` nicht `localhost`, `127.0.0.1` oder `postgres` ist. So kann der Job nie versehentlich die Produktionsdatenbank (Neon) verändern.
+
+### Daten
+
+Der Job lädt **keine** Daten. Die echten Daten von football-data.org dürfen nicht ins öffentliche Repo oder in ein Image, weil die Weitergabe nicht geklärt ist. Sie werden lokal mit den Ingestion-Skripten geladen (`kubectl port-forward svc/postgres 5434:5432`, dann `python -m src.main` mit `DB_HOST=localhost`, `DB_PORT=5434` und `DB_SSLMODE=` leer). Für die CI folgt später ein kleiner erfundener Datensatz, der ins Repo darf. Der Ordner `/seed/` ist in `.gitignore` und `.dockerignore` eingetragen.
+
+### Job oder SQL-Skript im Postgres-Container?
+
+Skripte in `/docker-entrypoint-initdb.d` laufen nur, wenn das Datenverzeichnis **leer** ist, nur im Postgres-Container und nur als SQL oder Shell. Der Init-Job ist dagegen separat sichtbar (Status, Logs, Wiederholungen), wiederholbar, nutzt denselben Python-Code wie die Pipeline und wartet selbst auf die Datenbank. Das Gegenteil wäre richtig, wenn nur ein festes Schema oder eine Rolle per reinem SQL angelegt werden soll: Dann ist `initdb.d` einfacher, braucht kein eigenes Image und läuft garantiert vor der ersten Verbindung.

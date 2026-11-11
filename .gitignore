@@ -10,3 +10,6 @@ __pycache__/
 
 # Kubernetes: echte Secrets nie committen
 k8s/secret.yaml
+
+# Echte Daten von football-data.org duerfen nicht ins Repo (Weitergabe nicht geklaert)
+/seed/
