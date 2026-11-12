@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: matchlytics
+  labels:
+    app: matchlytics
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: matchlytics
+      component: api
+  template:
+    metadata:
+      labels:
+        app: matchlytics
+        component: api
+    spec:
+      containers:
+        - name: api
+          image: matchlytics-api:dev
+          # Das Image liegt nur lokal in k3s, nicht in einer Registry
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          # Einstellungen (DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE, LOG_LEVEL ...) aus der ConfigMap.
+          # Das Secret wird bewusst NICHT per envFrom eingebunden: Es enthaelt die Zugangsdaten des
+          # Admin-Benutzers, die API soll aber nur die Read-only-Rolle bekommen.
+          envFrom:
+            - configMapRef:
+                name: matchlytics-config
+          env:
+            - name: DB_USER
+              value: api_ro
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: matchlytics-secrets
+                  key: API_RO_PASSWORD
+
