@@ -226,3 +226,39 @@ docker compose --profile legacy up app     # bisheriger Einzelcontainer mit dire
 ```
 
 Der Dienst `api` liest die Datenbank-Zugangsdaten aus `.env`. Zeigt sie auf Neon, liest die API dort. Für den lokalen Betrieb sollten eigene Werte gesetzt werden.
+
+## Gesamtbild
+
+### Datenfluss
+
+```mermaid
+flowchart LR
+    FD[football-data.org] -->|Ingestion| RAW[(Bronze: raw_teams, raw_matches)]
+    RAW -->|SQL-Views| SILVER[Silver: stg_*, dim_teams, fact_matches]
+    SILVER -->|SQL-Views| GOLD[Gold: fct_*]
+    GOLD -->|SELECT, Rolle api_ro| API[FastAPI]
+    API -->|HTTP| DASH[Streamlit-Dashboard]
+    DASH --> USER((Nutzer))
+    ING[Ingress / Traefik] --> DASH
+    USER --> ING
+    INIT[Init-Job] -.->|Tabellen, Views, Rechte| RAW
+```
+
+- **Bronze, Silver, Gold** sind Tabellen und Views in PostgreSQL. Die Pipeline lädt nur Bronze, alles darüber sind Views.
+- Das Dashboard hat keinen Datenbank-Zugang, nur die API liest (mit der Read-only-Rolle `api_ro`).
+- Der **Init-Job** bereitet die Datenbank im Cluster vor (siehe [kubernetes.md](kubernetes.md)). In Produktion (Render und Neon) liest das Dashboard weiter direkt aus der Datenbank, weil dort `API_URL` nicht gesetzt ist.
+
+### Weg vom Commit zum laufenden Pod
+
+```mermaid
+flowchart LR
+    DEV[Commit / Pull Request] --> TEST[Job test: flake8, pytest]
+    TEST --> BUILD[Job build: drei Images]
+    BUILD -->|nur Push auf main| HUB[(Docker Hub: Commit-ID und latest)]
+    BUILD --> DEPLOY[Job deploy-test: k3d-Cluster]
+    DEPLOY --> SMOKE[Smoke Test: /ready, /standings, Dashboard-Health]
+    LOCAL[Lokal: docker build und k3s ctr import] --> K3S[k3s-Cluster: Deployments, Services, Ingress]
+```
+
+- Pull Requests durchlaufen `test`, `build` und `deploy-test`, pushen aber nichts.
+- Der lokale Cluster bekommt seine Images per Hand importiert. Ein automatisches Ausrollen in einen dauerhaften Cluster gibt es noch nicht, siehe [ci-cd.md](ci-cd.md).

@@ -44,9 +44,53 @@
 
 ## Systemarchitektur
 
-<div align="center">
-  <img src="docs/architecture/architecture.png" alt="Matchlytics System Architecture" width="100%" />
-</div>
+```mermaid
+flowchart LR
+    subgraph Source["⚽ Data Source"]
+        API["football-data.org\nREST API"]
+    end
+
+    subgraph Pipeline["⚙️ ELT Pipeline"]
+        direction TB
+        GH["GitHub Actions\n⏰ Nightly 04:00 CET"]
+        PY["Python 3.12\nsrc/main.py"]
+        GH --> PY
+    end
+
+    subgraph Cloud_DB["☁️ Neon PostgreSQL · Frankfurt"]
+        direction TB
+        subgraph Bronze["Bronze Layer"]
+            RAW_M["raw_matches"]
+            RAW_T["raw_teams"]
+        end
+        subgraph Silver["Silver Layer"]
+            STG["stg_matches\nfact_matches\ndim_teams"]
+        end
+        subgraph Gold["Gold Layer"]
+            FCT["fct_standings\nfct_season_trend\nfct_home_away_stats\nfct_team_ratings\nfct_team_form"]
+        end
+        Bronze --> Silver --> Gold
+    end
+
+    subgraph Frontend["📊 Streamlit Dashboard"]
+        direction TB
+        ST["Streamlit + Plotly"]
+        RENDER["Render.com\n🚀 Auto-Deploy"]
+        ST --- RENDER
+    end
+
+    subgraph Monitoring["🔍 Monitoring"]
+        UR["UptimeRobot\nKeyword Check"]
+        LOG["Structured Logging\n+ Health Endpoint"]
+    end
+
+    API -->|"HTTP GET"| PY
+    PY -->|"INSERT\npsycopg2 · SSL"| Bronze
+    Gold -->|"SQL Views"| ST
+    UR -->|"/_stcore/health"| RENDER
+```
+
+Die Produktion (Render und Neon) liest das Dashboard direkt aus der Datenbank. Die Variante mit API, Kubernetes und CI/CD steht im [Gesamtbild](docs/architecture.md#gesamtbild).
 
 ---
 
@@ -140,14 +184,56 @@ docker compose up -d --build
 
 ---
 
+## Kubernetes lokal (k3s)
+
+Matchlytics läuft auch in einem lokalen Kubernetes-Cluster: PostgreSQL, API und Dashboard als eigene Deployments, davor ein Traefik-Ingress. Die Produktion (Render und Neon) bleibt davon unberührt. Details und Hintergründe: [docs/kubernetes.md](docs/kubernetes.md).
+
+**Voraussetzungen:** Linux, Docker und `kubectl`.
+
+```bash
+# 1. k3s installieren und kubectl darauf zeigen lassen
+curl -sfL https://get.k3s.io | sh -
+mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $USER ~/.kube/config
+export KUBECONFIG=$HOME/.kube/config
+
+# 2. Images bauen und in k3s importieren (sie liegen nur lokal)
+for n in api dashboard pipeline; do docker build -f Dockerfile.$n -t matchlytics-$n:dev .; done
+docker save matchlytics-api:dev matchlytics-dashboard:dev matchlytics-pipeline:dev | sudo k3s ctr images import -
+
+# 3. Namespace und Secret anlegen (eigene Werte, das Secret gehört nie ins Repo)
+kubectl apply -f k8s/namespace.yaml
+kubectl create secret generic matchlytics-secrets -n matchlytics \
+  --from-literal=DB_USER=matchlytics --from-literal=DB_PASSWORD=<passwort> \
+  --from-literal=FOOTBALL_API_KEY=dummy --from-literal=API_RO_PASSWORD=<anderes-passwort>
+
+# 4. Alles ausrollen und auf den Init-Job warten (Tabellen, Views, Read-only-Rolle)
+kubectl apply -k k8s
+kubectl wait --for=condition=complete job/init-db -n matchlytics --timeout=300s
+
+# 5. Optional: erfundene Testdaten laden (echte Daten siehe docs/kubernetes.md)
+kubectl exec -i -n matchlytics deploy/postgres -- psql -U matchlytics -d matchlytics < ci/seed.sql
+
+# 6. Dashboard öffnen
+kubectl get pods -n matchlytics          # alle Pods Running und 1/1
+# → http://matchlytics.localhost
+```
+
+---
+
 ## Projektstruktur
 
 ```
 football-data-pipeline/
 ├── .github/workflows/
+│   ├── ci.yml                # Tests, Image-Builds, Deploy-Test in k3d
 │   └── pipeline.yml          # Nightly ELT via GitHub Actions
+├── ci/                       # Kustomize-Overlay und Testdaten für die CI
+├── k8s/                      # Kubernetes-Manifeste (mit kustomization.yaml)
 ├── docs/
-│   ├── architecture/          # Architekturdiagramm (PNG)
+│   ├── adr/                  # Architekturentscheidungen
+│   ├── architecture.md       # Architektur (Mermaid), Aufbau von API, Dashboard und Gesamtbild
+│   ├── ci-cd.md              # CI/CD mit GitHub Actions
+│   ├── kubernetes.md         # Kubernetes-Notizen, Troubleshooting
 │   ├── logo/                 # Logo & Favicon
 │   └── screenshots/          # Dashboard-Screenshots
 ├── sql/staging/
@@ -164,12 +250,15 @@ football-data-pipeline/
 │   ├── main.py               # ELT Pipeline Runner
 │   ├── ingestion/            # API → Bronze
 │   ├── transformation/       # Bronze → Silver → Gold
+│   ├── api/                  # FastAPI auf den Gold-Views
 │   ├── pages/                # Dashboard-Seiten (00–06)
-│   └── utils/                # DB Client, Logger, Styles, Components
-├── tests/                    # pytest – DB Integrity Checks
-├── Dockerfile                # Image (python:3.12-slim)
-├── docker-compose.yml        # Single-Service Compose (App → Neon DB)
-└── requirements.txt          # Pinned Dependencies
+│   ├── seed/                 # Init-Job: Tabellen, Views, Read-only-Rolle
+│   └── utils/                # DB Client, API-Client, Logger, Styles, Components
+├── tests/                    # pytest: API, Datenzugriff, Transformationen
+├── Dockerfile                # Einzel-Image (Render baut daraus)
+├── Dockerfile.api / .dashboard / .pipeline   # getrennte Images für den Cluster
+├── docker-compose.yml        # API und Dashboard lokal
+└── requirements*.txt         # Pinned Dependencies (je Image eine Datei)
 ```
 
 ---
@@ -179,6 +268,9 @@ football-data-pipeline/
 | Feature | Details |
 |---|---|
 | **Nightly ELT** | GitHub Actions Cron (04:00 CET), inklusive Auto-Issue bei Fehler |
+| **CI** | Jeder Push und PR: flake8, pytest, Image-Builds für API, Dashboard und Pipeline |
+| **Deploy-Test** | Kurzlebiger k3d-Cluster in der CI, Manifeste ausrollen, Smoke Test mit Testdaten |
+| **Registry** | Push auf `main` → Images nach Docker Hub, getaggt mit Commit-ID und `latest` |
 | **Auto-Deploy** | Push auf `main` → Render baut & deployed automatisch |
 | **Health Endpoint** | `/_stcore/health` → `ok` (Streamlit built-in) |
 | **UptimeRobot** | Keyword-Monitoring prüft Health Endpoint alle 5 Min. |

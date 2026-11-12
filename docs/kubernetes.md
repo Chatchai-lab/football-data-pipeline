@@ -333,3 +333,42 @@ Gemessen im Leerlauf mit `kubectl top pods` (metrics-server):
 **Was wäre passiert, wenn die Liveness-Probe der API die DB geprüft hätte und Postgres kurz ausfällt?** Alle API-Pods hätten die Probe gleichzeitig nicht bestanden und wären neu gestartet worden. Die Datenbank ist aber das Problem, nicht die API. Die Neustarts bringen sie nicht zurück und belasten die Datenbank beim Wiederanlauf zusätzlich (alle Pods bauen gleichzeitig Verbindungen auf).
 
 **Wie hängen die Probes mit dem Health Check aus Issue 18 zusammen?** Der `HEALTHCHECK` im Dockerfile gilt nur für Docker (zum Beispiel in `docker compose`), Kubernetes ignoriert ihn. Er nutzt denselben Pfad `/health`. In Kubernetes übernehmen die Probes diese Aufgabe, dort sind sie feiner einstellbar (getrennt nach Readiness und Liveness, mit Startup-Phase).
+
+## Dateien in `k8s/`
+
+| Datei | Was sie macht |
+|---|---|
+| `kustomization.yaml` | Bündelt alle Manifeste und setzt die Image-Tags an einer Stelle (`kubectl apply -k k8s`). |
+| `namespace.yaml` | Legt den Namespace `matchlytics` an, in dem alles läuft. |
+| `configmap.yaml` | Nicht geheime Einstellungen (DB-Host, Port, Name, `API_URL`, Log-Level) für alle Pods. |
+| `secret.example.yaml` | Vorlage für das Secret mit den Zugangsdaten. Das echte Secret wird nie aus dem Repo angewendet. |
+| `postgres-pvc.yaml` | Fordert Speicherplatz für die Datenbank an (PersistentVolumeClaim). |
+| `postgres.yaml` | Deployment der Datenbank (Strategie `Recreate`) mit Probes und Ressourcen. |
+| `postgres-service.yaml` | Feste Adresse `postgres:5432` im Cluster. |
+| `init-job.yaml` | Einmaliger Job: wartet auf Postgres, legt Tabellen, Views und die Read-only-Rolle an. |
+| `api-deployment.yaml` | Zwei API-Pods mit der Rolle `api_ro`, Probes `/health` und `/ready`. |
+| `api-service.yaml` | Feste Adresse `api` (Port 80 → 8000). |
+| `dashboard-deployment.yaml` | Zwei Dashboard-Pods ohne Datenbank-Zugangsdaten, nur mit `API_URL`. |
+| `dashboard-service.yaml` | Feste Adresse `dashboard` (Port 80 → 8501). |
+| `ingress.yaml` | Traefik-Regel: `matchlytics.localhost` → Service `dashboard`. |
+| `debug-pod.yaml` | Hilfspod zum Ausprobieren von DNS und Verbindungen im Cluster (nicht Teil von `kustomization.yaml`). |
+
+## Troubleshooting
+
+Probleme, die beim Aufbau tatsächlich aufgetreten sind.
+
+| Symptom | Ursache | Lösung |
+|---|---|---|
+| `Name or service not known` im Pod, `NXDOMAIN` für einen neuen Service, `metrics-server` auf `0/1` | Die IP des Rechners hat sich im WLAN geändert, CoreDNS hat die Verbindung zur Kubernetes-API verloren | `sudo systemctl restart k3s`, danach `kubectl rollout restart deployment/coredns -n kube-system` (Details oben im Abschnitt „Fehlerfall“) |
+| `ImagePullBackOff` bei einem lokalen Image | Das Image liegt nur im Docker-Daemon, nicht im Cluster | `docker save … \| sudo k3s ctr images import -`, im Manifest `imagePullPolicy: IfNotPresent` |
+| Docker-Build zeigt ein Image, das in k3s fehlt | Zwei Docker-Daemons (`default` und `desktop-linux`), das Image liegt im anderen | `docker context ls` prüfen, im Kontext `default` bauen |
+| `k3d image import` meldet Erfolg, Pods stehen auf `ImagePullBackOff` | Das Image enthält eine Provenance-Attestation, `ctr` meldet `unexpected EOF` | Build mit `provenance: false`, nach dem Import `crictl images` prüfen |
+| Pod `0/1 Running`, `RESTARTS 0` | Readiness-Probe schlägt fehl (Pfad, Port oder Datenbank) | `kubectl describe pod`, Ereignisse lesen, Probe-Pfad prüfen |
+| `RESTARTS` steigt, Pod beendet sich wiederholt | Liveness-Probe schlägt fehl oder `OOMKilled` | `kubectl describe pod` (`Last State`, `Exit Code: 137`), Speicher-Limit erhöhen |
+| `requests.memory must be less than or equal to memory limit` | Limit unter dem Request | Beide Werte passend setzen |
+| Init-Job: vier Pods in `Error`, Job `Failed` | Falsches `DB_PASSWORD` im Secret (`password authentication failed`) | Secret korrigieren, Job löschen und neu anwenden |
+| Dashboard hängt hinter dem Ingress auf „Please wait“ | Streamlit lehnt WebSockets von einem anderen Host ab | `STREAMLIT_BROWSER_SERVER_ADDRESS=matchlytics.localhost` setzen |
+| `No module named 'src'` beim lokalen Start | Python findet das Projekt nicht | `PYTHONPATH="$PWD"` setzen |
+| Produktion zeigte plötzlich Fehler in Tabellen | `pyarrow` 26 verlangt NumPy 2, Streamlit 1.35 braucht NumPy unter 2 | `pyarrow==23.0.1` pinnen (in beiden Anforderungsdateien) |
+| CI: `ResolutionImpossible` für `typing_extensions` | `requirements.txt` pinnt 4.15.0, `pydantic` braucht ab 4.16 | In der CI in zwei Schritten installieren; langfristig eine gemeinsame Lock-Datei |
+| `src/seed/` fehlt im Repo oder Image | `.gitignore` mit `seed/` greift in jeder Tiefe, `.dockerignore` nur im Wurzelordner | Eintrag in `.gitignore` als `/seed/` verankern |
