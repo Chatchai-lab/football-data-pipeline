@@ -262,3 +262,26 @@ flowchart LR
 
 - Pull Requests durchlaufen `test`, `build` und `deploy-test`, pushen aber nichts.
 - Der lokale Cluster bekommt seine Images per Hand importiert. Ein automatisches Ausrollen in einen dauerhaften Cluster gibt es noch nicht, siehe [ci-cd.md](ci-cd.md).
+
+### Monitoring im Cluster
+
+```mermaid
+flowchart LR
+    subgraph Quellen["Quellen"]
+        API1[API-Pod 1<br/>/metrics]
+        API2[API-Pod 2<br/>/metrics]
+        PIPE[Pipeline-Lauf<br/>kurzlebig]
+    end
+
+    PIPE -->|"Push am Ende<br/>pushadd"| PG[Pushgateway<br/>:9091]
+    PROM[Prometheus]
+    PROM -->|"Pull alle 15 s"| API1
+    PROM -->|"Pull alle 15 s"| API2
+    PROM -->|"Pull alle 15 s"| PG
+    K8S[Kubernetes-API] -.->|"Service Discovery<br/>role: endpoints"| PROM
+    USER((Du)) -->|"PromQL im Browser<br/>(Port-Forward)"| PROM
+```
+
+- Die API wird per **Pull** abgefragt. Prometheus findet jeden Pod einzeln über die Kubernetes-API und erkennt neue Pods selbst.
+- Die Pipeline läuft nur kurz. Deshalb **schiebt** sie ihr Ergebnis (Dauer, geladene Zeilen, Zeitpunkt des letzten Erfolgs) am Ende zum Pushgateway, und Prometheus holt es dort ab.
+- Die Produktion (Render und Neon) hat dieses Monitoring nicht. Dort prüft UptimeRobot den Health-Endpoint, siehe das erste Diagramm. Details zu Metriken und Abfragen: [monitoring.md](monitoring.md).
