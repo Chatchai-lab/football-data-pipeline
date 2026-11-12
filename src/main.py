@@ -5,6 +5,7 @@ import datetime
 from src.transformation.run_transformations import transform_data
 from tests.test_database_integrity import run_quality_checks
 from src.utils.logger import get_logger
+from src.utils.metrics_push import push_pipeline_metrics
 
 logger = get_logger("pipeline")
 
@@ -46,9 +47,12 @@ def run_pipeline():
         logger.info("Matches geladen: %d", count_matches)
         logger.info("Gesamtstatus:    ERFOLGREICH")
         logger.info("=" * 50)
-        
+        push_pipeline_metrics(duration.total_seconds(), count_teams, count_matches, success=True)
+
     except Exception as e:
         logger.error("Fehler bei der Pipeline-Ausführung: %s", str(e), exc_info=True)
+        elapsed = (datetime.datetime.now() - start_time).total_seconds()
+        push_pipeline_metrics(elapsed, count_teams, count_matches, success=False)
         raise
     
 
