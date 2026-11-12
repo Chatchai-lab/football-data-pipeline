@@ -13,7 +13,10 @@
     <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python" />
     <img src="https://img.shields.io/badge/Streamlit-1.35-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit" />
     <img src="https://img.shields.io/badge/PostgreSQL-Neon_Cloud-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/FastAPI-REST_API-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
     <img src="https://img.shields.io/badge/Docker-Container-2496ED?logo=docker&logoColor=white" alt="Docker" />
+    <img src="https://img.shields.io/badge/Kubernetes-k3s-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes" />
+    <img src="https://img.shields.io/badge/Prometheus-Monitoring-E6522C?logo=prometheus&logoColor=white" alt="Prometheus" />
     <img src="https://img.shields.io/badge/Plotly-Interactive_Charts-3F4F75?logo=plotly&logoColor=white" alt="Plotly" />
     <img src="https://img.shields.io/badge/GitHub_Actions-Nightly_ELT-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions" />
     <img src="https://img.shields.io/badge/Render-Live_Deploy-46E3B7?logo=render&logoColor=white" alt="Render" />
@@ -102,9 +105,14 @@ Die Produktion (Render und Neon) liest das Dashboard direkt aus der Datenbank. D
 | **Dashboard** | Streamlit 1.35 · Plotly 5.22 |
 | **Datenbank** | PostgreSQL 15 – gehostet auf **Neon** (Serverless, Frankfurt) |
 | **Orchestrierung** | GitHub Actions (Cron: `0 2 * * *` UTC → 04:00 CET) |
-| **Containerisierung** | Docker · Docker Compose |
+| **API** | FastAPI · Pydantic · SQLAlchemy (read-only auf den Gold-Views) |
+| **Containerisierung** | Docker · Docker Compose · Docker Hub |
+| **Orchestrierung (lokal)** | Kubernetes (k3s) · Kustomize · Traefik-Ingress |
+| **CI/CD** | GitHub Actions: pytest, Image-Builds, Deploy-Test in k3d mit Smoke Test |
 | **Hosting** | Render.com (Auto-Deploy von `main`) |
-| **Monitoring** | UptimeRobot · Structured Logging · Health Endpoint |
+| **Monitoring** | Prometheus · Pushgateway · UptimeRobot · Structured Logging · Health Endpoints |
+| **Lasttest** | Locust (als Job im Cluster) |
+| **Tests** | pytest · pytest-mock |
 | **Datenquelle** | [football-data.org](https://www.football-data.org/) REST API |
 
 ---
@@ -218,6 +226,8 @@ kubectl get pods -n matchlytics          # alle Pods Running und 1/1
 # → http://matchlytics.localhost
 ```
 
+Monitoring (Prometheus und Pushgateway) und Lasttest sind optional: siehe [docs/monitoring.md](docs/monitoring.md) und [docs/loadtest.md](docs/loadtest.md).
+
 ---
 
 ## Projektstruktur
@@ -229,11 +239,15 @@ football-data-pipeline/
 │   └── pipeline.yml          # Nightly ELT via GitHub Actions
 ├── ci/                       # Kustomize-Overlay und Testdaten für die CI
 ├── k8s/                      # Kubernetes-Manifeste (mit kustomization.yaml)
+│   └── monitoring/           # Prometheus und Pushgateway
+├── loadtest/                 # Locust-Skript und run.sh (Lasttest als Job im Cluster)
 ├── docs/
 │   ├── adr/                  # Architekturentscheidungen
 │   ├── architecture.md       # Architektur (Mermaid), Aufbau von API, Dashboard und Gesamtbild
 │   ├── ci-cd.md              # CI/CD mit GitHub Actions
 │   ├── kubernetes.md         # Kubernetes-Notizen, Troubleshooting
+│   ├── monitoring.md         # Prometheus: Metriken, Abfragen, Pushgateway
+│   ├── loadtest.md           # Lasttest: Ergebnisse, Engpässe, Grenzen
 │   ├── logo/                 # Logo & Favicon
 │   └── screenshots/          # Dashboard-Screenshots
 ├── sql/staging/
@@ -272,6 +286,9 @@ football-data-pipeline/
 | **Deploy-Test** | Kurzlebiger k3d-Cluster in der CI, Manifeste ausrollen, Smoke Test mit Testdaten |
 | **Registry** | Push auf `main` → Images nach Docker Hub, getaggt mit Commit-ID und `latest` |
 | **Auto-Deploy** | Push auf `main` → Render baut & deployed automatisch |
+| **Prometheus** | API-Metriken unter `/metrics` (Anfragen, Fehler, Antwortzeiten), Pipeline-Metriken über den Pushgateway, siehe [docs/monitoring.md](docs/monitoring.md) |
+| **Lasttest** | Locust im Cluster, 1 bis 3 API-Replikas, Engpässe und Ergebnisse in [docs/loadtest.md](docs/loadtest.md) |
+| **Probes** | API: `/health` (Liveness) und `/ready` (Readiness, prüft die Datenbank) |
 | **Health Endpoint** | `/_stcore/health` → `ok` (Streamlit built-in) |
 | **UptimeRobot** | Keyword-Monitoring prüft Health Endpoint alle 5 Min. |
 | **Structured Logging** | Zentraler Logger mit konfigurierbarem `LOG_LEVEL` |
