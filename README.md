@@ -252,6 +252,7 @@ football-data-pipeline/
 │   └── screenshots/          # Dashboard-Screenshots
 ├── sql/staging/
 │   ├── stg_matches.sql       # Silver: Staging View
+│   ├── stg_standings.sql     # Silver: Staging View (Punkte je Spiel)
 │   ├── fact_matches.sql      # Silver: Fact View
 │   ├── dim_teams.sql         # Silver: Dimension View
 │   ├── fct_standings.sql     # Gold: Liga-Tabelle
