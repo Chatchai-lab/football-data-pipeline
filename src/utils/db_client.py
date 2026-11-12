@@ -33,6 +33,11 @@ def get_db_engine():
             pool_pre_ping=True,           # Prüft Verbindung vor Nutzung (hilft bei Neon Cold-Start)
             pool_recycle=300,              # Recycled Connections alle 5 Min.
             connect_args={"connect_timeout": 10},  # 10 Sek. Timeout für Neon Wakeup
+            # Größe des Verbindungspools, per Umgebungsvariable einstellbar. Die Standardwerte sind die
+            # von SQLAlchemy, die Produktion ändert sich also nicht. Die API im Cluster setzt eigene Werte.
+            pool_size=int(os.getenv('DB_POOL_SIZE') or 5),
+            max_overflow=int(os.getenv('DB_MAX_OVERFLOW') or 10),
+            pool_timeout=int(os.getenv('DB_POOL_TIMEOUT') or 30),
         )
         return engine
     except Exception as e:

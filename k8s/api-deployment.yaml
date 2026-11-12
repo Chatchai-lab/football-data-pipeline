@@ -39,6 +39,15 @@ spec:
                 secretKeyRef:
                   name: matchlytics-secrets
                   key: API_RO_PASSWORD
+            # Verbindungspool pro Pod: bis zu 20 Verbindungen (10 + 10), wer keine bekommt, wartet hoechstens
+            # 5 s und bekommt dann einen 503. Bei drei Replikas sind das hoechstens 60 von 100 erlaubten
+            # Postgres-Verbindungen. Gemessen im Lasttest, siehe docs/loadtest.md.
+            - name: DB_POOL_SIZE
+              value: "10"
+            - name: DB_MAX_OVERFLOW
+              value: "10"
+            - name: DB_POOL_TIMEOUT
+              value: "5"
           # Readiness: bekommt der Pod Traffic? /ready prueft auch die Datenbank.
           # Schlaegt sie fehl, nimmt der Service den Pod aus der Verteilung, der Pod bleibt aber am Leben.
           readinessProbe:

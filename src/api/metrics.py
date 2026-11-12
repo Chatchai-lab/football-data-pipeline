@@ -36,6 +36,12 @@ DB_ERRORS = Counter(
 )
 
 
+POOL_TIMEOUTS = Counter(
+    "api_pool_timeouts_total",
+    "Anfragen, die keine Datenbankverbindung bekamen (Pool erschoepft) und mit 503 endeten",
+)
+
+
 def route_template(request: Request) -> str:
     """Pfad der Route, z. B. /standings. Unbekannte Pfade werden zusammengefasst,
     damit Scanner oder Tippfehler nicht unbegrenzt viele Label-Werte erzeugen."""
