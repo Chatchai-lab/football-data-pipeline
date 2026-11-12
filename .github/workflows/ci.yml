@@ -111,3 +111,142 @@ jobs:
           # Layer-Cache von GitHub Actions, pro Image getrennt
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  # Deploy-Test: ein kurzlebiger k3d-Cluster (k3s in Docker) auf dem Runner. Die Manifeste werden
+  # mit den frisch gebauten Images ausgerollt, danach prueft ein Smoke Test die Anwendung.
+  deploy-test:
+    name: Deploy in k3d und Smoke Test
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLUSTER: matchlytics
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Dieselben Dockerfiles und derselbe Layer-Cache wie im Job "build", daher schnell.
+      # Die Images bleiben lokal (load) und werden gleich in den Cluster importiert. So testet
+      # auch ein Pull Request seinen eigenen Code, ohne etwas nach Docker Hub zu schieben.
+      - name: Build api image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.api
+          load: true
+          # Ohne Provenance-Attestation: Sie macht das Image zu einem Index, den der Import
+          # in den k3d-Cluster nicht verarbeiten kann ("failed to ingest blob ... unexpected EOF").
+          provenance: false
+          tags: matchlytics-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+
+      - name: Build dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dashboard
+          load: true
+          # Ohne Provenance-Attestation: Sie macht das Image zu einem Index, den der Import
+          # in den k3d-Cluster nicht verarbeiten kann ("failed to ingest blob ... unexpected EOF").
+          provenance: false
+          tags: matchlytics-dashboard:${{ github.sha }}
+          cache-from: type=gha,scope=dashboard
+
+      - name: Build pipeline image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.pipeline
+          load: true
+          # Ohne Provenance-Attestation: Sie macht das Image zu einem Index, den der Import
+          # in den k3d-Cluster nicht verarbeiten kann ("failed to ingest blob ... unexpected EOF").
+          provenance: false
+          tags: matchlytics-pipeline:${{ github.sha }}
+          cache-from: type=gha,scope=pipeline
+
+      # Feste k3d-Version, damit der Test reproduzierbar bleibt
+      - name: Install k3d
+        run: |
+          curl -fsSL -o k3d https://github.com/k3d-io/k3d/releases/download/v5.8.3/k3d-linux-amd64
+          chmod +x k3d
+          sudo mv k3d /usr/local/bin/k3d
+          k3d version
+
+      - name: Create cluster and import images
+        run: |
+          k3d cluster create "$CLUSTER" --wait --timeout 180s
+          k3d image import \
+            matchlytics-api:$TAG matchlytics-dashboard:$TAG matchlytics-pipeline:$TAG \
+            -c "$CLUSTER"
+          # k3d meldet "Successfully imported" auch bei einem Fehler in ctr. Deshalb pruefen wir selbst,
+          # ob die drei Images im Cluster angekommen sind.
+          docker exec "k3d-$CLUSTER-server-0" crictl images > cluster-images.txt
+          cat cluster-images.txt
+          for n in api dashboard pipeline; do
+            grep -q "matchlytics-$n *$TAG" cluster-images.txt \
+              || { echo "::error::Image matchlytics-$n:$TAG fehlt im Cluster"; exit 1; }
+          done
+          kubectl get nodes
+
+      # Secret mit Wegwerf-Werten nur fuer diesen Lauf. Es steht nirgends im Repo.
+      - name: Deploy with Kustomize
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl create secret generic matchlytics-secrets -n matchlytics \
+            --from-literal=DB_USER=ci_admin \
+            --from-literal=DB_PASSWORD="$(openssl rand -hex 12)" \
+            --from-literal=FOOTBALL_API_KEY=dummy \
+            --from-literal=API_RO_PASSWORD="$(openssl rand -hex 12)"
+          # Platzhalter-Tag "ci" im Overlay durch die Commit-ID ersetzen
+          sed -i "s/newTag: ci/newTag: $TAG/" ci/kustomization.yaml
+          kubectl apply -k ci
+
+      # Reihenfolge: Postgres, Init-Job (Tabellen, Views, Rolle), Testdaten, dann API und Dashboard
+      - name: Wait for Postgres and init job
+        run: |
+          kubectl rollout status deployment/postgres -n matchlytics --timeout=300s
+          kubectl wait --for=condition=complete job/init-db -n matchlytics --timeout=300s
+
+      - name: Load test data
+        run: |
+          kubectl exec -i -n matchlytics deploy/postgres -- \
+            psql -U ci_admin -d matchlytics -v ON_ERROR_STOP=1 < ci/seed.sql
+
+      - name: Wait for API and dashboard
+        run: |
+          kubectl rollout status deployment/api -n matchlytics --timeout=300s
+          kubectl rollout status deployment/dashboard -n matchlytics --timeout=300s
+
+      # Smoke Test: nicht nur "Pod laeuft", sondern echte Daten durch die ganze Kette
+      - name: Smoke test
+        run: |
+          kubectl port-forward -n matchlytics svc/api 8000:80 &
+          kubectl port-forward -n matchlytics svc/dashboard 8501:80 &
+          trap 'kill $(jobs -p)' EXIT
+          sleep 5
+          echo "API /ready:"
+          curl -fsS http://localhost:8000/ready; echo
+          echo "API /standings (Saison 2025):"
+          curl -fsS "http://localhost:8000/standings?season=2025" | tee standings.json | jq .
+          jq -e 'length == 4' standings.json
+          jq -e '.[0].team_name == "FC Testburg"' standings.json
+          echo "Dashboard /_stcore/health:"
+          curl -fsS http://localhost:8501/_stcore/health; echo
+
+      # Bei einem Fehler Diagnose-Informationen ins Log schreiben
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,svc,jobs -n matchlytics -o wide || true
+          kubectl describe pods -n matchlytics || true
+          kubectl logs -n matchlytics job/init-db --all-containers --tail=100 || true
+          kubectl logs -n matchlytics deploy/api --tail=100 || true
+          kubectl logs -n matchlytics deploy/dashboard --tail=100 || true
+          kubectl get events -n matchlytics --sort-by=.lastTimestamp || true
+
+      - name: Delete cluster
+        if: always()
+        run: k3d cluster delete "$CLUSTER" || true

@@ -20,6 +20,10 @@
   </p>
 
   <p>
+    <a href="https://github.com/Chatchai-lab/football-data-pipeline/actions/workflows/ci.yml"><img src="https://github.com/Chatchai-lab/football-data-pipeline/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  </p>
+
+  <p>
     <a href="https://matchlytics.onrender.com"><strong>Live-Demo →</strong></a>
   </p>
 </div>
