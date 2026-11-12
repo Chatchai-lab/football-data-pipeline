@@ -47,6 +47,36 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          # pg_isready fragt den Server, ob er Verbindungen annimmt. Es laeuft im Container,
+          # die Variablen kommen aus dessen Umgebung (Secret/ConfigMap).
+          # Startup: bis zu 60 s Zeit, z. B. fuer die Wiederherstellung nach einem unsauberen Ende.
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Gemessen im Leerlauf: 1m CPU, 26 Mi RAM. Postgres nutzt unter Last mehr (shared_buffers
+          # standardmaessig 128 MB), deshalb 512 Mi als Obergrenze. Wird das Limit ueberschritten,
+          # beendet Kubernetes den Container (OOMKilled), das waere bei einer Datenbank unschoen.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
       volumes:
         - name: data
           persistentVolumeClaim:

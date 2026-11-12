@@ -35,3 +35,34 @@ spec:
             # Hinter dem Ingress ist das matchlytics.localhost, sonst wird die Verbindung abgelehnt.
             - name: STREAMLIT_BROWSER_SERVER_ADDRESS
               value: matchlytics.localhost
+          # Streamlit braucht einige Sekunden zum Starten. Die Startup-Probe gibt bis zu 60 s Zeit
+          # (30 x 2 s), erst danach greifen Readiness und Liveness.
+          startupProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Gemessen im Leerlauf: 0m CPU, 45 Mi (ohne Besucher) bis 98 Mi (mit offener Sitzung).
+          # Streamlit haelt DataFrames im Speicher, deshalb ein grosszuegiges Speicher-Limit.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
