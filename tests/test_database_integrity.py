@@ -9,8 +9,19 @@ def test_check_team_count():
         count = conn.execute(text("SELECT COUNT(*) FROM raw_teams")).scalar()
         assert count == 18, f"Erwartet 18 Teams, gefunden: {count}"
 
-def test_check_finished_matches_have_scores():
+@pytest.fixture
+def db_engine():
+    """Liefert eine Engine, oder ueberspringt den Test, wenn keine Datenbank erreichbar ist (z. B. in der CI)."""
     engine = get_db_engine()
+    try:
+        engine.connect().close()
+    except Exception:
+        pytest.skip("Keine Datenbankverbindung verfuegbar")
+    return engine
+
+
+def test_check_finished_matches_have_scores(db_engine):
+    engine = db_engine
     query = "SELECT COUNT(*) FROM raw_matches WHERE status = 'FINISHED' AND score_home IS NULL"
     with engine.connect() as conn:
         invalid_matches = conn.execute(text(query)).scalar()

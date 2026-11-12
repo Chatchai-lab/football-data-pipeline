@@ -1,0 +1,109 @@
+name: CI
+
+# Bei jedem Pull Request und jedem Push auf main:
+#   1. test  - Lint, Import-Check und pytest
+#   2. build - die drei Images bauen (api, dashboard, pipeline)
+# Gepusht wird nur auf main und nur, wenn die Tests gruen sind.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Der Workflow darf standardmaessig nur lesen.
+permissions:
+  contents: read
+
+# Ein neuer Push bricht den noch laufenden Lauf desselben Branches ab.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # requirements.txt enthaelt die Pipeline- und Dashboard-Pakete samt pytest.
+      # Die API-Tests brauchen zusaetzlich FastAPI und httpx (fuer den TestClient).
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-api.txt httpx==0.28.1 flake8
+
+      - name: Lint with flake8
+        run: |
+          # Bricht bei Syntaxfehlern und undefinierten Namen ab
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv,.git
+          # Stilhinweise nur als Warnung
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.venv,.git
+
+      - name: Check imports
+        env:
+          DB_USER: ci_user
+          DB_PASSWORD: ci_password
+          DB_NAME: ci_db
+          FOOTBALL_API_KEY: ci_key
+        run: |
+          python -c "import src.main; import src.api.main; print('Imports ok')"
+
+      - name: Run pytest
+        env:
+          DB_USER: ci_user
+          DB_PASSWORD: ci_password
+          DB_NAME: ci_db
+          FOOTBALL_API_KEY: ci_key
+        run: pytest -q
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: test
+    runs-on: ubuntu-latest
+    # Ein Job-Template, drei Images (jeweils eigenes Dockerfile.<name>)
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [api, dashboard, pipeline]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login nur beim Push auf main. Pull Requests bekommen (bei Forks) keine Secrets und pushen nichts.
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Tags: <user>/matchlytics-<name>:<commit-sha> und :latest
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME || 'matchlytics' }}/matchlytics-${{ matrix.name }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.name }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer-Cache von GitHub Actions, pro Image getrennt
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
