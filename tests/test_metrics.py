@@ -92,3 +92,57 @@ def test_unreachable_gateway_never_breaks_the_pipeline(monkeypatch, mocker):
     monkeypatch.setenv("PUSHGATEWAY_URL", "pushgateway:9091")
     mocker.patch("prometheus_client.pushadd_to_gateway", side_effect=OSError("Verbindung abgelehnt"))
     assert metrics_push.push_pipeline_metrics(1.0, 1, 1, success=True) is False
+
+
+# --- Ueberlast: Pool erschoepft ---------------------------------------------
+
+def test_exhausted_pool_returns_503_with_retry_after():
+    from sqlalchemy.exc import TimeoutError as PoolTimeoutError
+    from src.api.deps import get_db
+
+    def pool_is_empty():
+        raise PoolTimeoutError("QueuePool limit of size 5 overflow 10 reached")
+        yield  # macht die Funktion zum Generator wie das echte get_db
+
+    app.dependency_overrides[get_db] = pool_is_empty
+    try:
+        response = client.get("/ready")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "2"
+    assert "api_pool_timeouts_total" in metrics_text()
+
+
+def test_health_does_not_need_a_thread_or_a_database():
+    import inspect
+    from src.api.main import health
+
+    assert inspect.iscoroutinefunction(health)
+
+
+# --- Pool-Einstellungen ------------------------------------------------------
+
+def test_pool_defaults_are_unchanged(monkeypatch):
+    from src.utils.db_client import get_db_engine
+
+    for name in ("DB_POOL_SIZE", "DB_MAX_OVERFLOW", "DB_POOL_TIMEOUT"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DB_USER", "u")
+    monkeypatch.setenv("DB_NAME", "n")
+    engine = get_db_engine()
+    assert engine.pool.size() == 5
+    assert engine.pool.timeout() == 30
+
+
+def test_pool_can_be_configured_by_environment(monkeypatch):
+    from src.utils.db_client import get_db_engine
+
+    monkeypatch.setenv("DB_USER", "u")
+    monkeypatch.setenv("DB_NAME", "n")
+    monkeypatch.setenv("DB_POOL_SIZE", "12")
+    monkeypatch.setenv("DB_POOL_TIMEOUT", "4")
+    engine = get_db_engine()
+    assert engine.pool.size() == 12
+    assert engine.pool.timeout() == 4
