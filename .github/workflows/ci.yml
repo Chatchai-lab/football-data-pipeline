@@ -233,6 +233,9 @@ jobs:
           curl -fsS "http://localhost:8000/standings?season=2025" | tee standings.json | jq .
           jq -e 'length == 4' standings.json
           jq -e '.[0].team_name == "FC Testburg"' standings.json
+          echo "API /metrics:"
+          curl -fsS http://localhost:8000/metrics | grep -q 'http_requests_total{method="GET",path="/standings",status="200"}'
+          echo "ok"
           echo "Dashboard /_stcore/health:"
           curl -fsS http://localhost:8501/_stcore/health; echo
 
