@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Alle Manifeste, die zusammen die Anwendung ergeben.
+# Nicht dabei: secret.example.yaml (nur eine Vorlage) und debug-pod.yaml (Hilfsmittel).
+# Das Secret mit den echten Zugangsdaten wird nie aus dem Repo angewendet.
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres-pvc.yaml
+  - postgres.yaml
+  - postgres-service.yaml
+  - init-job.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - dashboard-deployment.yaml
+  - dashboard-service.yaml
+  - ingress.yaml
+
+# Image-Tags an einer Stelle. Die Deployments verweisen auf name:dev.
+# Ein Overlay (zum Beispiel ci) ersetzt den Tag, etwa durch die Commit-ID.
+images:
+  - name: matchlytics-api
+    newTag: dev
+  - name: matchlytics-dashboard
+    newTag: dev
+  - name: matchlytics-pipeline
+    newTag: dev
