@@ -231,3 +231,62 @@ Der Job lädt **keine** Daten. Die echten Daten von football-data.org dürfen ni
 ### Job oder SQL-Skript im Postgres-Container?
 
 Skripte in `/docker-entrypoint-initdb.d` laufen nur, wenn das Datenverzeichnis **leer** ist, nur im Postgres-Container und nur als SQL oder Shell. Der Init-Job ist dagegen separat sichtbar (Status, Logs, Wiederholungen), wiederholbar, nutzt denselben Python-Code wie die Pipeline und wartet selbst auf die Datenbank. Das Gegenteil wäre richtig, wenn nur ein festes Schema oder eine Rolle per reinem SQL angelegt werden soll: Dann ist `initdb.d` einfacher, braucht kein eigenes Image und läuft garantiert vor der ersten Verbindung.
+
+## API und Dashboard als Deployments
+
+### Bausteine
+
+| Datei | Was sie macht |
+|---|---|
+| `api-deployment.yaml` | 2 Pods mit `matchlytics-api:dev`, Port 8000 |
+| `api-service.yaml` | Service `api`, Port 80 → 8000 |
+| `dashboard-deployment.yaml` | 2 Pods mit `matchlytics-dashboard:dev`, Port 8501 |
+| `dashboard-service.yaml` | Service `dashboard`, Port 80 → 8501 |
+| `ingress.yaml` | Traefik-Ingress, `matchlytics.localhost` → Service `dashboard` |
+
+Die Images liegen nur lokal und werden in k3s importiert (`docker save … | sudo k3s ctr images import -`). Deshalb steht in den Deployments `imagePullPolicy: IfNotPresent`. Größen: API 180 MB, Dashboard 661 MB, Pipeline 316 MB. Das Dashboard-Image ist nur wenig kleiner als das frühere Einzel-Image, weil Streamlit, pandas, Plotly und pyarrow den größten Teil ausmachen. Der Gewinn liegt woanders: Es enthält keinen Datenbank-Code und keine Zugangsdaten.
+
+### Deployment, ReplicaSet, Pod
+
+Ein **Deployment** beschreibt den Soll-Zustand (Image, Anzahl Kopien). Es erzeugt ein **ReplicaSet**, und das ReplicaSet erzeugt und überwacht die **Pods**. Das ReplicaSet sorgt dafür, dass immer so viele Pods laufen, wie `replicas` sagt. Bei einem Update legt das Deployment ein neues ReplicaSet an und lässt das alte mit 0 Pods stehen, damit ein Rollback möglich ist.
+
+```bash
+kubectl get deploy,rs,pods,svc,ingress -n matchlytics
+```
+
+### Service, Labels und Selector
+
+Ein Service ist eine feste Adresse (und ein DNS-Name) vor wechselnden Pods. Er findet seine Pods über den **Selector**: Alle Pods, deren Labels zu `app: matchlytics` und `component: api` passen, werden Ziel. Das sieht man mit `kubectl get endpoints api -n matchlytics`. Ein Pod wird erst aufgenommen, wenn er bereit ist. Ohne Probe gilt ein Pod als bereit, sobald der Container läuft (Probes folgen in einem späteren Issue).
+
+Das Dashboard erreicht die API über `http://api` (ConfigMap-Wert `API_URL`). Der Kurzname klappt, weil der Pod die Suchdomäne `matchlytics.svc.cluster.local` bekommt. Geprüft mit `kubectl exec deploy/dashboard -n matchlytics -- python -c "import urllib.request as u; print(u.urlopen('http://api/ready').read())"`. Antwort: `{"status":"ready","database":"ok"}`.
+
+### Ingress
+
+Der Ingress ist die Eingangstür des Clusters. k3s bringt **Traefik** als Controller mit. Die Regel leitet `matchlytics.localhost` an den Service `dashboard` weiter. `*.localhost` zeigt im Browser auf `127.0.0.1`, Traefik lauscht dort auf Port 80. Zum Debuggen eines einzelnen Dienstes ohne Ingress dient `kubectl port-forward svc/api 8000:80 -n matchlytics`.
+
+Streamlit prüft bei WebSocket-Verbindungen die Herkunft der Seite. Das Dashboard bekommt deshalb `STREAMLIT_BROWSER_SERVER_ADDRESS=matchlytics.localhost`.
+
+### Zugangsdaten
+
+Die API bekommt die ConfigMap per `envFrom`, aber **nicht** das Secret per `envFrom`: Es enthält die Zugangsdaten des Admin-Benutzers. Stattdessen setzt das Deployment `DB_USER=api_ro` und holt nur `DB_PASSWORD` aus dem Schlüssel `API_RO_PASSWORD`. Die API arbeitet also mit der Read-only-Rolle. Das Dashboard bekommt nur `API_URL` und keinerlei Datenbank-Zugangsdaten.
+
+### Beobachtet
+
+- **Self-Healing:** Ein gelöschter API-Pod wurde sofort durch einen neuen ersetzt.
+- **Skalieren:** `kubectl scale deployment/api --replicas=4` startete zwei weitere Pods, neue Pods tauchten erst als Endpoint auf, als sie bereit waren. `scale` ändert nur den Cluster, nicht die Datei.
+- **Rolling Update:** `kubectl rollout restart` erzeugte ein zweites ReplicaSet, das alte blieb mit 0 Pods erhalten (`kubectl rollout history` zeigt zwei Revisionen).
+- **Fehlerhaftes Update:** Mit `kubectl set image deployment/api api=matchlytics-api:gibt-es-nicht` hing der neue Pod in `ErrImagePull`, die beiden alten Pods liefen unverändert weiter. `kubectl rollout undo` räumte auf. `undo` ändert nur den Cluster, nicht `last-applied-configuration`. Im Alltag korrigiert man die YAML-Datei und wendet sie neu an.
+
+### Fehlerfall: Cluster-DNS findet neue Services nicht
+
+Symptom: `Name or service not known` aus dem Dashboard-Pod und `NXDOMAIN` für `api.matchlytics.svc.cluster.local`, obwohl der Service existierte und Endpoints hatte. Ältere Services wie `postgres` wurden noch aufgelöst. CoreDNS hatte seine Verbindung zur Kubernetes-API verloren, weil sich die IP-Adresse des Rechners im WLAN geändert hatte (`192.168.2.164` → `100.81.75.109`). Auch `metrics-server` blieb deshalb auf `0/1`.
+
+Behebung: `sudo systemctl restart k3s` (trägt die neue Adresse ein), danach `kubectl rollout restart deployment/coredns -n kube-system`. Ein CoreDNS-Neustart allein half nicht, solange k3s noch die alte Adresse nutzte. Bei einem lokalen Laptop-Cluster kann das nach einem Netzwechsel wieder passieren.
+
+### Verständnisfragen
+
+**Woher weiß der Service, an welche Pods er Anfragen schicken soll?** Über den Selector (`app` und `component`). Kubernetes pflegt die Liste der passenden, bereiten Pods als Endpoints. Pods kommen und gehen, die Liste wird automatisch angepasst.
+
+**Was passiert bei `replicas: 1` in der YAML und erneutem Anwenden, nachdem per `scale` auf 3 erhöht wurde?** Die Datei ist der Soll-Zustand und gewinnt. `apply` setzt `replicas` zurück auf 1, zwei Pods werden beendet. Änderungen mit `kubectl scale` überleben ein erneutes `apply` nicht. Wer dauerhaft skalieren will, ändert die Datei.
+
+**Warum soll die Datenbank nur von der API erreichbar sein?** Das Dashboard ist die größte Angriffsfläche (Browser-Eingaben, viele Bibliotheken). Hätte es direkten Datenbankzugang, könnte ein Fehler dort die Daten offenlegen. Die API ist ein enger, getesteter Zugang mit Read-only-Rolle. Im Cluster lässt sich das mit einer **NetworkPolicy** erzwingen: Sie erlaubt Verkehr zu Postgres (Port 5432) nur von Pods mit `component: api`. k3s bringt mit kube-router eine Umsetzung mit. Das ist hier noch nicht eingerichtet, die Trennung beruht bisher auf den fehlenden Zugangsdaten im Dashboard.

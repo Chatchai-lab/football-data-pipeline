@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: matchlytics
+  labels:
+    app: matchlytics
+    component: dashboard
+spec:
+  type: ClusterIP
+  selector:
+    app: matchlytics
+    component: dashboard
+  ports:
+    - port: 80
+      targetPort: 8501
