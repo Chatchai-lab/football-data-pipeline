@@ -39,4 +39,32 @@ spec:
                 secretKeyRef:
                   name: matchlytics-secrets
                   key: API_RO_PASSWORD
+          # Readiness: bekommt der Pod Traffic? /ready prueft auch die Datenbank.
+          # Schlaegt sie fehl, nimmt der Service den Pod aus der Verteilung, der Pod bleibt aber am Leben.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Liveness: lebt der Prozess noch? Bewusst /health ohne Datenbank.
+          # Wuerde die Liveness-Probe die DB pruefen, wuerde ein kurzer DB-Ausfall alle API-Pods neu starten.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Gemessen im Leerlauf: ca. 2m CPU und 42-44 Mi RAM. Requests liegen darueber,
+          # das Speicher-Limit gibt etwa den dreifachen Spielraum.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
 

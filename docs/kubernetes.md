@@ -290,3 +290,46 @@ Behebung: `sudo systemctl restart k3s` (trägt die neue Adresse ein), danach `ku
 **Was passiert bei `replicas: 1` in der YAML und erneutem Anwenden, nachdem per `scale` auf 3 erhöht wurde?** Die Datei ist der Soll-Zustand und gewinnt. `apply` setzt `replicas` zurück auf 1, zwei Pods werden beendet. Änderungen mit `kubectl scale` überleben ein erneutes `apply` nicht. Wer dauerhaft skalieren will, ändert die Datei.
 
 **Warum soll die Datenbank nur von der API erreichbar sein?** Das Dashboard ist die größte Angriffsfläche (Browser-Eingaben, viele Bibliotheken). Hätte es direkten Datenbankzugang, könnte ein Fehler dort die Daten offenlegen. Die API ist ein enger, getesteter Zugang mit Read-only-Rolle. Im Cluster lässt sich das mit einer **NetworkPolicy** erzwingen: Sie erlaubt Verkehr zu Postgres (Port 5432) nur von Pods mit `component: api`. k3s bringt mit kube-router eine Umsetzung mit. Das ist hier noch nicht eingerichtet, die Trennung beruht bisher auf den fehlenden Zugangsdaten im Dashboard.
+
+## Probes und Ressourcen
+
+### Probes
+
+| Workload | Readiness | Liveness | Startup |
+|---|---|---|---|
+| API | `/ready` (prüft die Datenbank) | `/health` (ohne Datenbank) | nicht nötig |
+| Dashboard | `/_stcore/health` | `/_stcore/health` | bis 60 s (30 × 2 s) |
+| Postgres | `pg_isready` | `pg_isready` | bis 60 s |
+
+- **Readiness** beantwortet: Bekommt der Pod Traffic? Schlägt sie fehl, nimmt der Service den Pod aus der Verteilung, der Pod läuft weiter.
+- **Liveness** beantwortet: Muss der Pod neu gestartet werden? Schlägt sie fehl, beendet Kubernetes den Container und startet ihn neu.
+- **Startup** gibt langsamen Programmen Zeit. Readiness und Liveness beginnen erst, wenn sie besteht.
+- Die Liveness-Probe der API prüft bewusst **nicht** die Datenbank. Sonst würde ein kurzer Ausfall von Postgres alle API-Pods gleichzeitig neu starten, ohne das Problem zu lösen. Diese Trennung ist der Grund für `/health` und `/ready`.
+
+### Requests und Limits
+
+Gemessen im Leerlauf mit `kubectl top pods` (metrics-server):
+
+| Workload | gemessen CPU / RAM | requests | limits |
+|---|---|---|---|
+| API | 2m / 42–44 Mi | 25m / 64 Mi | 250m / 128 Mi |
+| Dashboard | 0m / 45–98 Mi | 50m / 128 Mi | 500m / 384 Mi |
+| Postgres | 1m / 26 Mi | 50m / 128 Mi | 500m / 512 Mi |
+
+- **requests** sind die garantierte Menge, der Scheduler plant damit. **limits** sind die Obergrenze: Zu viel CPU wird gebremst, zu viel Speicher beendet den Container (`OOMKilled`).
+- Die Werte liegen über den Leerlaufwerten, weil unter Last mehr gebraucht wird. Das Dashboard bekommt mehr Spielraum (Streamlit hält DataFrames im Speicher), Postgres ebenfalls (`shared_buffers` standardmäßig 128 MB, ein `OOMKilled` wäre bei einer Datenbank besonders unschön).
+- Ein Limit unter dem Request ist nicht erlaubt (`requests.memory must be less than or equal to memory limit`).
+
+### Experimente
+
+1. **Falscher Readiness-Pfad (API):** Der neue Pod stand auf `0/1 Running` mit `RESTARTS 0`, die Endpoints enthielten nur die alten Pods. Das Rolling Update blieb stehen, die alten Pods liefen weiter, ohne Ausfall. **Falscher Liveness-Pfad:** Nach etwa 70 s (10 s Verzögerung plus 3 × 20 s) startete Kubernetes beide Container neu (`RESTARTS 1`).
+2. **Postgres mit `replicas: 0`:** Beide API-Pods wurden `0/1`, die Endpoints leer, `RESTARTS` unverändert. In einem Pod lieferte `/health` `200` und `/ready` `503`. Nach dem Hochfahren von Postgres waren die API-Pods nach etwa 20 s wieder `1/1`, ohne Eingriff. Die Daten waren erhalten, weil sie auf dem PersistentVolume liegen.
+3. **Speicher-Limit 20 Mi (Request 16 Mi):** Die API braucht rund 42 Mi. Der neue Pod endete mit `OOMKilled`, `Exit Code: 137`, danach `CrashLoopBackOff` (Kubernetes verlängert die Wartezeit zwischen den Neustarts). Die alten Pods liefen weiter. Mit `kubectl apply -f k8s/api-deployment.yaml` kamen die richtigen Werte zurück.
+
+### Verständnisfragen
+
+**Was ist der Unterschied zwischen „nicht ready“ und „wird neu gestartet“?** Nicht ready: Der Pod bleibt am Leben, bekommt aber keinen Traffic, bis die Readiness-Probe wieder besteht. Neu gestartet: Die Liveness-Probe ist mehrfach fehlgeschlagen, der Container wird beendet und neu erzeugt (`RESTARTS` steigt). Nicht ready ist die mildere Maßnahme.
+
+**Was wäre passiert, wenn die Liveness-Probe der API die DB geprüft hätte und Postgres kurz ausfällt?** Alle API-Pods hätten die Probe gleichzeitig nicht bestanden und wären neu gestartet worden. Die Datenbank ist aber das Problem, nicht die API. Die Neustarts bringen sie nicht zurück und belasten die Datenbank beim Wiederanlauf zusätzlich (alle Pods bauen gleichzeitig Verbindungen auf).
+
+**Wie hängen die Probes mit dem Health Check aus Issue 18 zusammen?** Der `HEALTHCHECK` im Dockerfile gilt nur für Docker (zum Beispiel in `docker compose`), Kubernetes ignoriert ihn. Er nutzt denselben Pfad `/health`. In Kubernetes übernehmen die Probes diese Aufgabe, dort sind sie feiner einstellbar (getrennt nach Readiness und Liveness, mit Startup-Phase).
