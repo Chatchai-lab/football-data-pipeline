@@ -34,10 +34,14 @@ jobs:
 
       # requirements.txt enthaelt die Pipeline- und Dashboard-Pakete samt pytest.
       # Die API-Tests brauchen zusaetzlich FastAPI und httpx (fuer den TestClient).
+      # Zwei getrennte Aufrufe: requirements.txt pinnt typing_extensions==4.15.0, pydantic aus
+      # requirements-api.txt braucht >=4.16. In einem Aufruf waere das ein Konflikt, im zweiten
+      # Schritt darf pip typing_extensions aktualisieren.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-api.txt httpx==0.28.1 flake8
+          pip install -r requirements.txt
+          pip install -r requirements-api.txt httpx==0.28.1 flake8
 
       - name: Lint with flake8
         run: |
